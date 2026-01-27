@@ -1,1 +1,11 @@
+#:schema https://cloudflare.github.io/wrangler-schema/config.schema.json
+name = "singbox-remote-worker" # 别人fork后，只需要在这里改个好听的楼盘名
+main = "src/index.js"
+compatibility_date = "2026-01-27"
 
+# --- [设计院行政区域配置] ---
+[vars]
+GITHUB_USER = "Vonzhen"             # 这里填自己的 GitHub ID
+REPO_NAME = "singbox-profiles"     # 仓库名字
+BRANCH = "main"                    # 默认主线分支
+# 提醒：敏感物资（如 AUTH_TOKEN, GITHUB_TOKEN, SUB_LINK_X）请在 CF 后台手动加密存放
