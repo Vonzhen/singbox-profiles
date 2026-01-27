@@ -3,7 +3,7 @@ name: 皇家设计院·自动部署中枢
 on:
   push:
     branches:
-      - main
+      - master
     paths:
       - 'src/**'
       - 'profiles/**'
