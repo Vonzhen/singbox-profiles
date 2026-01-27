@@ -1,1 +1,1 @@
-# singbox-profiles
+# singbox-profiles-autoupdate
