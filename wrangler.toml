@@ -7,5 +7,5 @@ compatibility_date = "2026-01-27"
 [vars]
 GITHUB_USER = "Vonzhen"             # 这里填自己的 GitHub ID
 REPO_NAME = "singbox-profiles"     # 仓库名字
-BRANCH = "main"                    # 默认主线分支
+BRANCH = "master"                    # 默认主线分支
 # 提醒：敏感物资（如 AUTH_TOKEN, GITHUB_TOKEN, SUB_LINK_X）请在 CF 后台手动加密存放
