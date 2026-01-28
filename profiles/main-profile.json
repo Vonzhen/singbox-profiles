@@ -79,11 +79,11 @@
       { "rule_set": ["GeoLocation-!CN"], "outbound": "🗽 节点选择" }
     ],
     "rule_set": [
-      { "tag": "geoip-google", "type": "remote", "url": "https://ghfast.top/https://github.com/MetaCubeX/meta-rules-dat/blob/sing/geo/geoip/google.srs", "format": "binary", "download_detour": "🎯 全球直连" },
-      { "tag": "geosite-google", "type": "remote", "url": "https://ghfast.top/https://github.com/MetaCubeX/meta-rules-dat/blob/sing/geo/geosite/google.srs", "format": "binary", "download_detour": "🎯 全球直连" },
+      { "tag": "geoip-google", "type": "remote", "url": "https://testingcf.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@sing/geo/geoip/google.srs", "format": "binary", "download_detour": "🎯 全球直连" },
+      { "tag": "geosite-google", "type": "remote", "url": "https://testingcf.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@sing/geo/geosite/google.srs", "format": "binary", "download_detour": "🎯 全球直连" },
       { "tag": "geosite-spotify", "type": "remote", "url": "https://testingcf.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@sing/geo-lite/geosite/spotify.srs", "format": "binary", "download_detour": "🎯 全球直连" },
       { "tag": "geosite-tiktok", "type": "remote", "url": "https://testingcf.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@sing/geo-lite/geosite/tiktok.srs", "format": "binary", "download_detour": "🎯 全球直连" },
-      { "tag": "geoip-telegram", "type": "remote", "url": "https://ghfast.top/https://github.com/MetaCubeX/meta-rules-dat/blob/sing/geo/geoip/telegram.srs", "format": "binary", "download_detour": "🎯 全球直连" },
+      { "tag": "geoip-telegram", "type": "remote", "url": "https://testingcf.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@sing/geo/geoip/telegram.srs", "format": "binary", "download_detour": "🎯 全球直连" },
       { "tag": "geosite-telegram", "type": "remote", "url": "https://ghfast.top/https://github.com/MetaCubeX/meta-rules-dat/blob/sing/geo/geosite/telegram.srs", "format": "binary", "download_detour": "🎯 全球直连" },
       { "tag": "geosite-disney", "type": "remote", "url": "https://ghfast.top/https://github.com/MetaCubeX/meta-rules-dat/blob/sing/geo/geosite/disney.srs", "format": "binary", "download_detour": "🎯 全球直连" },
       { "tag": "geosite-primevideo", "type": "remote", "url": "https://ghfast.top/https://github.com/MetaCubeX/meta-rules-dat/blob/sing/geo/geosite/primevideo.srs", "format": "binary", "download_detour": "🎯 全球直连" },
