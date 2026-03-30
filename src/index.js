@@ -1,11 +1,10 @@
 /**
- * sing-box 设计院自动化中枢
+ * sing-box 设计院自动化中枢 V6.1 (规格修复版)
  * 首席绘图员：您的私人助理
+ * 更新说明：修复了 VLESS Reality 协议中 fingerprint 为数字导致的客户端解析错误
  */
 
 // --- 【设计院标准库：区域关键字】 ---
-// 老板，如果您发现某个项目的节点名字比较奇葩（比如叫 "HK-极速"），
-// 您就在下面对应的区域里加上关键字，大脑就能自动识别并归类。
 const REGION_KEYWORDS = {
   "HK": ["HK", "香港", "HONGKONG", "HKG", "KONG"],
   "TW": ["TW", "台湾", "TAIWAN", "ROC", "台北"],
@@ -29,7 +28,7 @@ export default {
 
     try {
       // --- 1. 调取档案室私密图纸 ---
-      const githubUrl = `https://raw.githubusercontent.com/${env.GITHUB_USER}/${env.REPO_NAME}/${env.BRANCH || 'main'}/profiles/main-profile.json`;
+      const githubUrl = `https://raw.githubusercontent.com/${env.GITHUB_USER}/${env.REPO_NAME}/${env.BRANCH || 'master'}/profiles/main-profile.json`;
       const configRes = await fetch(`${githubUrl}?t=${Date.now()}`, {
         headers: { 
           "Authorization": `token ${env.GITHUB_TOKEN}`,
@@ -54,6 +53,19 @@ export default {
           const res = await fetch(subUrl, { cache: "no-store", headers: { "User-Agent": "Mozilla/5.0 (Clash)" } });
           const data = await res.json();
           let nodes = (Array.isArray(data) ? data : (data.outbounds || []));
+
+          // 🏗️ 核心补丁：强类型打磨工序 (解决指纹为数字的问题)
+          nodes = nodes.map(n => {
+            // 修复 tls.utls.fingerprint
+            if (n.tls?.utls?.fingerprint !== undefined) {
+              n.tls.utls.fingerprint = String(n.tls.utls.fingerprint);
+            }
+            // 修复 tls.reality.short_id (预防性修复)
+            if (n.tls?.reality?.short_id !== undefined) {
+              n.tls.reality.short_id = String(n.tls.reality.short_id);
+            }
+            return n;
+          });
 
           // 核心质检：过滤高倍率和杂质建材
           nodes = nodes.filter(n => {
@@ -101,44 +113,33 @@ export default {
         const t = group.tag;
         if (group.type !== "selector") return group;
 
-        /**
-         * 🎨 老板私人定制区：景观准入红线
-         * 您可以根据需求，在这里精准指定每个“样板间”能看到哪些景观组。
-         */
-        let keys = ["🗽 节点选择"]; // 极致秩序：所有房间默认第一位都是总控
+        let keys = ["🗽 节点选择"]; 
 
         if (t === "🗽 节点选择") {
-          // 总控大厅：精选分包商组 + 零散节点
           const others = allRealNodes.filter(n => 
             !Object.values(REGION_KEYWORDS).flat().some(k => n.tag.toUpperCase().includes(k))
           ).map(n => n.tag);
           keys = [...allGeneratedRegionalTags, ...new Set(others)];
         } 
         else if (t === "🦚 PeacockTV" || t === "🅾️ OpenAI") {
-          // 商务与美剧项目：只看美国景观
           keys.push(...regionalGroupsMap["US"]);
         }
         else if (t === "🌀 Hamivideo") {
-          // 台湾专项项目：只看台湾景观
           keys.push(...regionalGroupsMap["TW"]);
         }
         else if (t === "📹️ Viu") {
-          // 香港专项项目：只看香港景观
           keys.push(...regionalGroupsMap["HK"]);
         }
         else if (t === "🎞 Emby") {
-          // 影音联动项目：直连 + 亚美精选区域
           keys.push("🎯 全球直连", ...regionalGroupsMap["HK"], ...regionalGroupsMap["SG"], ...regionalGroupsMap["US"]);
         }
         else if (t === "🍎 Apple" || t === "🐧 Tencent") {
-          // 兼容项目：增加直连保障
           keys.push("🎯 全球直连");
         }
         else if (["🐟 漏网之鱼", "🌐 GLOBAL"].includes(t)) {
-          // 兜底项目：保持绝对简洁，只留总调令
+          // 仅保留总控
         }
         else {
-          // 通用项目 (如 Netflix, YouTube)：五大区景观全数进驻
           keys.push(...allGeneratedRegionalTags);
         }
 
@@ -146,7 +147,7 @@ export default {
         return group;
       });
 
-      // --- 5. 最终交付与缓存管理 ---
+      // --- 5. 最终交付与落地节点注入 ---
       const seen = new Set();
       const uniqueNodes = allRealNodes.filter(n => !seen.has(n.tag) && seen.add(n.tag));
       config.outbounds = [...config.outbounds.filter(o => o.type), ...dynamicGroups, ...uniqueNodes];
@@ -154,7 +155,9 @@ export default {
       return new Response(JSON.stringify(config, null, 2), {
         headers: { 
           "Content-Type": "application/json; charset=utf-8",
-          "Cache-Control": "no-store, no-cache, must-revalidate"
+          "Cache-Control": "no-store, no-cache, must-revalidate",
+          "Pragma": "no-cache",
+          "Expires": "0"
         }
       });
 
