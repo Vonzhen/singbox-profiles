@@ -31,24 +31,25 @@
   ],
   "outbounds": [
     { "type": "direct", "tag": "🎯 全球直连" },
-    { "type": "selector", "tag": "🗽 节点选择", "interrupt_exist_connections": true, "outbounds": ["🎯 全球直连"] },
-    { "type": "selector", "tag": "📺️ Netflix", "interrupt_exist_connections": true, "outbounds": ["🗽 节点选择"] },
-    { "type": "selector", "tag": "🌀 Hamivideo", "interrupt_exist_connections": true, "outbounds": ["🗽 节点选择"] },
-    { "type": "selector", "tag": "📹️ HBO max", "interrupt_exist_connections": true, "outbounds": ["🗽 节点选择"] },
-    { "type": "selector", "tag": "🕍 Disney Plus", "interrupt_exist_connections": true, "outbounds": ["🗽 节点选择"] },
-    { "type": "selector", "tag": "🎬️ Prime Video", "interrupt_exist_connections": true, "outbounds": ["🗽 节点选择"] },
-    { "type": "selector", "tag": "🎥 YouTube", "interrupt_exist_connections": true, "outbounds": ["🗽 节点选择"] },
-    { "type": "selector", "tag": "🌎 Google", "interrupt_exist_connections": true, "outbounds": ["🗽 节点选择"] },
-    { "type": "selector", "tag": "📹️ Viu", "interrupt_exist_connections": true, "outbounds": ["🗽 节点选择"] },
-    { "type": "selector", "tag": "🎞 Emby", "interrupt_exist_connections": true, "outbounds": ["🗽 节点选择"] },
-    { "type": "selector", "tag": "💿 Spotify", "interrupt_exist_connections": true, "outbounds": ["🗽 节点选择"] },
-    { "type": "selector", "tag": "📽️ TikTok", "interrupt_exist_connections": true, "outbounds": ["🗽 节点选择"] },
-    { "type": "selector", "tag": "🛩️ Telegram", "interrupt_exist_connections": true, "outbounds": ["🗽 节点选择"] },
-    { "type": "selector", "tag": "🅾️ OpenAI", "interrupt_exist_connections": true, "outbounds": ["🗽 节点选择"] },
-    { "type": "selector", "tag": "🍎 Apple", "interrupt_exist_connections": true, "outbounds": ["🗽 节点选择", "🎯 全球直连"] },
-    { "type": "selector", "tag": "🐧 Tencent", "interrupt_exist_connections": true, "outbounds": ["🗽 节点选择", "🎯 全球直连"] },
-    { "type": "selector", "tag": "🐟 漏网之鱼", "interrupt_exist_connections": true, "outbounds": ["🗽 节点选择"] },
-    { "type": "selector", "tag": "🌐 GLOBAL", "interrupt_exist_connections": true, "outbounds": ["🗽 节点选择"] }
+    { "type": "selector", "tag": "🗽 节点选择", "x_rule": "main", "interrupt_exist_connections": true, "outbounds": ["🎯 全球直连"] },
+    { "type": "selector", "tag": "📺️ Netflix", "x_rule": "all_regions", "interrupt_exist_connections": true, "outbounds": ["🗽 节点选择"] },
+    { "type": "selector", "tag": "🌀 Hamivideo", "x_rule": "region:TW", "interrupt_exist_connections": true, "outbounds": ["🗽 节点选择"] },
+    { "type": "selector", "tag": "📹️ HBO max", "x_rule": "all_regions", "interrupt_exist_connections": true, "outbounds": ["🗽 节点选择"] },
+    { "type": "selector", "tag": "🕍 Disney Plus", "x_rule": "all_regions", "interrupt_exist_connections": true, "outbounds": ["🗽 节点选择"] },
+    { "type": "selector", "tag": "🎬️ Prime Video", "x_rule": "all_regions", "interrupt_exist_connections": true, "outbounds": ["🗽 节点选择"] },
+    { "type": "selector", "tag": "🎥 YouTube", "x_rule": "all_regions", "interrupt_exist_connections": true, "outbounds": ["🗽 节点选择"] },
+    { "type": "selector", "tag": "🌎 Google", "x_rule": "all_regions", "interrupt_exist_connections": true, "outbounds": ["🗽 节点选择"] },
+    { "type": "selector", "tag": "🦚 PeacockTV", "x_rule": "region:US", "interrupt_exist_connections": true, "outbounds": ["🗽 节点选择"] },
+    { "type": "selector", "tag": "📹️ Viu", "x_rule": "region:HK", "interrupt_exist_connections": true, "outbounds": ["🗽 节点选择"] },
+    { "type": "selector", "tag": "🎞 Emby", "x_rule": "region+direct:HK,SG,US", "interrupt_exist_connections": true, "outbounds": ["🗽 节点选择"] },
+    { "type": "selector", "tag": "💿 Spotify", "x_rule": "all_regions", "interrupt_exist_connections": true, "outbounds": ["🗽 节点选择"] },
+    { "type": "selector", "tag": "📽️ TikTok", "x_rule": "all_regions", "interrupt_exist_connections": true, "outbounds": ["🗽 节点选择"] },
+    { "type": "selector", "tag": "🛩️ Telegram", "x_rule": "all_regions", "interrupt_exist_connections": true, "outbounds": ["🗽 节点选择"] },
+    { "type": "selector", "tag": "🅾️ OpenAI", "x_rule": "region:US", "interrupt_exist_connections": true, "outbounds": ["🗽 节点选择"] },
+    { "type": "selector", "tag": "🍎 Apple", "x_rule": "keep", "interrupt_exist_connections": true, "outbounds": ["🗽 节点选择", "🎯 全球直连"] },
+    { "type": "selector", "tag": "🐧 Tencent", "x_rule": "keep", "interrupt_exist_connections": true, "outbounds": ["🗽 节点选择", "🎯 全球直连"] },
+    { "type": "selector", "tag": "🐟 漏网之鱼", "x_rule": "keep", "interrupt_exist_connections": true, "outbounds": ["🗽 节点选择"] },
+    { "type": "selector", "tag": "🌐 GLOBAL", "x_rule": "keep", "interrupt_exist_connections": true, "outbounds": ["🗽 节点选择"] }
   ],
   "route": {
     "rules": [
@@ -74,7 +75,8 @@
       { "rule_set": ["geosite-tiktok"], "outbound": "📽️ TikTok" },
       { "rule_set": ["geosite-myemby"], "outbound": "🎞 Emby" },
       { "rule_set": ["geosite-telegram", "geoip-telegram"], "outbound": "🛩️ Telegram" },
-      { "rule_set": ["GeoLocation-!CN"], "outbound": "🗽 节点选择" }
+      { "rule_set": ["GeoLocation-!CN"], "outbound": "🗽 节点选择" },
+      { "rule_set": ["geosite-PeacockTV"], "outbound": "🦚 PeacockTV" }
     ],
     "rule_set": [
       { "tag": "geoip-google", "type": "remote", "url": "https://testingcf.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@sing/geo/geoip/google.srs", "format": "binary", "download_detour": "🎯 全球直连" },
