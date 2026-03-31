@@ -9,7 +9,7 @@
       { "tag": "Cloudflare-DNS", "type": "https", "detour": "🗽 节点选择", "server": "1.1.1.1" }
     ],
     "rules": [
-      { "action": "reject", "rule_set": ["Category-Ads"], "method": "default" },
+      { "action": "reject", "rule_set": ["category-ads-all"], "method": "default" },
       { "action": "route", "clash_mode": "direct", "server": "Ali-DNS" },
       { "action": "route", "clash_mode": "global", "server": "Cloudflare-DNS" },
       { "action": "route", "rule_set": ["GeoSite-CN"], "server": "Ali-DNS" },
