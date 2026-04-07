@@ -16,7 +16,7 @@
       { "action": "route", "rule_set": ["geosite-geolocation-!cn"], "server": "Cloudflare-DNS" }
     ],
     "final": "Google-DNS",
-    "strategy": "ipv4_only"
+    "strategy": "prefer_ipv4"
   },
   "inbounds": [
     {
