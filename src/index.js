@@ -13,7 +13,7 @@ const REGION_KEYWORDS = {
   "TW": ["TW", "台湾", "TAIWAN", "ROC", "台北"],
   "SG": ["SG", "新加坡", "SINGAPORE", "SIN", "狮城"],
   "JP": ["JP", "日本", "JAPAN", "TOKYO", "OSAKA", "东京", "大阪"],
-  "US": ["US", "美国", "AMERICA", "LAX", "SFO", "SEA"]
+  "US": ["US", "美国", "AMERICA", "LAX", "SFO", "United States"]
 };
 
 // 区域旗帜映射
