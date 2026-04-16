@@ -9,11 +9,13 @@
       { "tag": "Cloudflare-DNS", "type": "https", "detour": "🗽 节点选择", "server": "1.1.1.1" }
     ],
     "rules": [
-      { "action": "reject", "rule_set": ["geosite-category-ads-all"], "method": "default" },
-      { "action": "route", "clash_mode": "direct", "server": "Ali-DNS" },
+      { "action": "reject", "rule_set": "geosite-category-ads-all", "method": "default" },
+      { "action": "route", "clash_mode": "direct","server": "Ali-DNS" },
       { "action": "route", "clash_mode": "global", "server": "Cloudflare-DNS" },
-      { "action": "route", "rule_set": ["geosite-cn"], "server": "Ali-DNS" },
-      { "action": "route", "rule_set": ["geosite-geolocation-!cn"], "server": "Cloudflare-DNS" }
+      { "action": "route", "rule_set": "geosite-cn", "server": "Ali-DNS" },
+      { "action": "evaluate", "server": "Cloudflare-DNS" },
+      { "action": "route", "match_response": true, "rule_set": "geoip-cn", "server": "Ali-DNS" },
+      { "action": "route", "rule_set": "geosite-geolocation-!cn", "server": "Cloudflare-DNS" }
     ],
     "final": "Google-DNS",
     "strategy": "prefer_ipv4"
@@ -112,6 +114,6 @@
       "secret": "ID_mm8q8b8l",
       "default_mode": "rule"
     },
-    "cache_file": { "enabled": true, "path": "cache.db", "store_fakeip": true }
+    "cache_file": { "enabled": true, "store_dns": true }
   }
 }
