@@ -2,6 +2,9 @@
   "log": {
     "level": "info"
   },
+  "http_clients": [
+    { "tag": "global-downloader", "detour": "🎯 全球直连", "timeout": "1m" }
+  ],
   "dns": {
     "servers": [
       { "tag": "Ali-DNS", "type": "https", "server": "223.5.5.5" },
@@ -104,7 +107,7 @@
       { "tag": "geosite-cn", "type": "remote", "url": "https://testingcf.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@sing/geo/geosite/cn.srs", "format": "binary" },
       { "tag": "geosite-geolocation-!cn", "type": "remote", "url": "https://testingcf.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@sing/geo/geosite/geolocation-!cn.srs", "format": "binary" }
     ],
-    "rule_set_detour": "🎯 全球直连",
+    "default_http_client": "global-downloader",
     "auto_detect_interface": true,
     "final": "🐟 漏网之鱼",
     "default_domain_resolver": { "server": "Ali-DNS" }
