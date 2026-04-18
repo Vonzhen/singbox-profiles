@@ -6,8 +6,7 @@ on:
       - master
     paths:
       - 'src/**'
-      - 'profiles/**'
-      - 'wrangler.toml' # 只要这三个核心区动了，立刻启动自动化施工
+      - 'wrangler.toml' # 只要这二个核心区动了，立刻启动自动化施工
 
 jobs:
   deploy:
