@@ -180,8 +180,9 @@ export default {
               type: "urltest",
               outbounds: [...new Set(matchedTags)],
               url: "https://www.gstatic.com/generate_204", 
-              interval: "3m", 
-              tolerance: 150
+              interval: "9m", 
+              tolerance: 150,
+              interrupt_exist_connections: true
             });
             regionalGroupsMap[reg].push(groupTag);
           }
