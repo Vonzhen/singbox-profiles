@@ -19,7 +19,7 @@
     { "action": "route", "rule_set": "geosite-geolocation-!cn", "server": "Cloudflare-DNS" },
     { "action": "evaluate", "server": "Cloudflare-DNS" },
     { "action": "route", "match_response": true, "rule_set": "geoip-cn", "server": "Ali-DNS" },
-    { "action": "respond" }
+    { "action": "route", "server": "Cloudflare-DNS" }
 ],
     "final": "Google-DNS",
     "strategy": "prefer_ipv4"
