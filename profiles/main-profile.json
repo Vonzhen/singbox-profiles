@@ -3,7 +3,7 @@
     "level": "info"
   },
   "http_clients": [
-    { "tag": "global-downloader", "detour": "🎯 全球直连" }
+    { "tag": "global-downloader" }
   ],
   "dns": {
     "servers": [
