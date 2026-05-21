@@ -26,7 +26,7 @@
   },
   "inbounds": [
     {
-      "type": "tun", "tag": "tun-in", "mtu": 9000, "address": ["172.18.0.1/30", "fdfe:dcba:9876::1/126"], "auto_route": true, "strict_route": true, "stack": "mixed" }
+      "type": "tun", "tag": "tun-in", "mtu": 9000, "address": ["172.18.0.1/30", "fdfe:dcba:9876::1/126"], "auto_route": true, "strict_route": false, "stack": "mixed", "dns_mode": "hijack" }
   ],
   "outbounds": [
     { "type": "direct", "tag": "🎯 全球直连" },
@@ -54,11 +54,9 @@
       { "protocol": "dns", "action": "hijack-dns" },
       { "clash_mode": "direct", "outbound": "🎯 全球直连" },
       { "clash_mode": "global", "outbound": "🌐 GLOBAL" },
-      { "protocol": "quic", "action": "reject" },
       { "rule_set": "geosite-category-ads-all", "action": "reject" },
       { "rule_set": ["geosite-apple", "geoip-apple"], "outbound": "🍎 Apple" },
       { "rule_set": ["geosite-tencent"], "outbound": "🐧 Tencent" },
-      { "rule_set": ["geosite-cn", "geoip-cn", "geosite-privatedirect"], "outbound": "🎯 全球直连" },
       { "rule_set": ["geosite-openai"], "outbound": "🅾️ OpenAI" },
       { "rule_set": ["geosite-youtube"], "outbound": "🎥 YouTube" },
       { "rule_set": ["geoip-google", "geosite-google"], "outbound": "🌎 Google" },
@@ -71,6 +69,7 @@
       { "rule_set": ["geosite-tiktok"], "outbound": "📽️ TikTok" },
       { "rule_set": ["geosite-privateemby"], "outbound": "🎞 Emby" },
       { "rule_set": ["geosite-telegram", "geoip-telegram"], "outbound": "🛩️ Telegram" },
+      { "rule_set": ["geosite-cn", "geoip-cn", "geosite-privatedirect"], "outbound": "🎯 全球直连" },
       { "rule_set": ["geosite-geolocation-!cn"], "outbound": "🗽 节点选择" }
     ],
     "rule_set": [
