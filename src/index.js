@@ -180,7 +180,7 @@ export default {
               type: "urltest",
               outbounds: [...new Set(matchedTags)],
               url: "https://www.gstatic.com/generate_204", 
-              interval: "9m", 
+              interval: "3m", 
               tolerance: 150,
               interrupt_exist_connections: true
             });
