@@ -1,4 +1,4 @@
-name: singbox配置中枢
+name: Deploy Worker
 
 on:
   push:
