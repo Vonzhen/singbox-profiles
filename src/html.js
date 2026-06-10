@@ -280,20 +280,26 @@ export function renderHTML() {
         formatDate(isoStr) { return isoStr ? new Date(isoStr).toLocaleString() : '-'; },
         
         async checkAuthStatus() {
-          try {
-            const res = await fetch('/api/me');
-            if (res.status === 200) {
-              this.user = await res.json();
-              this.isLoggedIn = true;
-              if (this.user.status === 'active') {
-                await this.loadSettings();
-                if (this.user.role === 'owner') await this.loadAdminUsers();
-              }
-            } else {
-              this.isLoggedIn = false;
-            }
-          } catch (e) { this.isLoggedIn = false; }
-        },
+  try {
+    const res = await fetch('/api/me');
+    if (res.status === 200) {
+      this.user = await res.json();
+      this.isLoggedIn = true;
+      if (this.user.status === 'active') {
+        await this.loadSettings();
+        if (this.user.role === 'owner') await this.loadAdminUsers();
+      }
+    } else {
+      // 捕获 401/403 等未登录状态，果断切到登录视窗
+      this.isLoggedIn = false;
+      this.user = { username: '', role: '', status: '', client_token: '' };
+    }
+  } catch (e) { 
+    // 发生网络故障或数据库未初始化时的兜底
+    this.isLoggedIn = false; 
+    this.user = { username: '', role: '', status: '', client_token: '' };
+  }
+},
 
         async handleLogin() {
           if (!this.authForm.username || !this.authForm.password) return alert("请完整填入账户凭证");
