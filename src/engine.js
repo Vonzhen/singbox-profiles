@@ -85,7 +85,7 @@ export async function generateConfig(userSubLinks, globalConfig, isDebug) {
     await Promise.all(activeConfigs.map(async (p) => {
       try {
         const subUrl = p.url.includes('?') ? `${p.url}&t=${Date.now()}` : `${p.url}?t=${Date.now()}`;
-        const res = await fetch(subUrl, { cache: "no-store", headers: { "User-Agent": "Mozilla/5.0 (Clash)" } });
+        const res = await fetch(subUrl, { headers: { "User-Agent": "Mozilla/5.0 (Clash)" } });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         
         const data = await res.json();
