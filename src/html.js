@@ -1,15 +1,10 @@
-/**
- * src/html.js
- * 前端可视化控制面板
- * 集成登录拦截、注册申请、多用户隔离看板及管理员审核体系
- */
 export function renderHTML() {
   return `<!DOCTYPE html>
 <html lang="zh-CN" class="dark">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>sing-box 配置中心</title>
+  <title>FlowProxy 控制中心</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
   <style>
@@ -52,7 +47,7 @@ export function renderHTML() {
             <button @click="handleLogin" :disabled="authLoading" class="flex-1 btn-primary text-center">
               {{ authLoading ? '验证中...' : '登录' }}
             </button>
-            <button @click="handleRegister" :disabled="authLoading" class="flex-1 bg-slate-700 hover:bg-slate-600 text-white padding py-2 rounded-disabled rounded-lg text-sm font-medium transition-colors">
+            <button @click="handleRegister" :disabled="authLoading" class="flex-1 bg-slate-700 hover:bg-slate-600 text-white padding py-2 rounded-lg text-sm font-medium transition-colors">
               申请注册
             </button>
           </div>
@@ -250,19 +245,13 @@ export function renderHTML() {
           activeTab: 'config',
           authForm: { username: '', password: '' },
           user: { username: '', role: '', status: '', client_token: '' },
-          
-          // 核心业务隔离数据
           sub_links: [],
-          
-          // 全局共有底座配置
           globalConfig: {
             BANNED_KEYWORDS: "",
             URLTEST_PARAMS: { url: "", interval: "", tolerance: 150 }
           },
           templateStr: "",
           regionStr: { HK: "", TW: "", SG: "", JP: "", US: "" },
-          
-          // 管理端审计数据
           adminUsers: [],
           testLogs: []
         }
@@ -280,26 +269,24 @@ export function renderHTML() {
         formatDate(isoStr) { return isoStr ? new Date(isoStr).toLocaleString() : '-'; },
         
         async checkAuthStatus() {
-  try {
-    const res = await fetch('/api/me');
-    if (res.status === 200) {
-      this.user = await res.json();
-      this.isLoggedIn = true;
-      if (this.user.status === 'active') {
-        await this.loadSettings();
-        if (this.user.role === 'owner') await this.loadAdminUsers();
-      }
-    } else {
-      // 捕获 401/403 等未登录状态，果断切到登录视窗
-      this.isLoggedIn = false;
-      this.user = { username: '', role: '', status: '', client_token: '' };
-    }
-  } catch (e) { 
-    // 发生网络故障或数据库未初始化时的兜底
-    this.isLoggedIn = false; 
-    this.user = { username: '', role: '', status: '', client_token: '' };
-  }
-},
+          try {
+            const res = await fetch('/api/me');
+            if (res.status === 200) {
+              this.user = await res.json();
+              this.isLoggedIn = true;
+              if (this.user.status === 'active') {
+                await this.loadSettings();
+                if (this.user.role === 'owner') await this.loadAdminUsers();
+              }
+            } else {
+              this.isLoggedIn = false;
+              this.user = { username: '', role: '', status: '', client_token: '' };
+            }
+          } catch (e) { 
+            this.isLoggedIn = false; 
+            this.user = { username: '', role: '', status: '', client_token: '' };
+          }
+        },
 
         async handleLogin() {
           if (!this.authForm.username || !this.authForm.password) return alert("请完整填入账户凭证");
@@ -346,7 +333,7 @@ export function renderHTML() {
         async handleLogout() {
           await fetch('/api/auth/logout', { method: 'POST' });
           this.isLoggedIn = false;
-          this.user = {};
+          this.user = { username: '', role: '', status: '', client_token: '' };
           this.authForm = { username: '', password: '' };
         },
 
@@ -383,7 +370,10 @@ export function renderHTML() {
                 this.saving = false;
                 return;
               }
+            } else {
+              payload.TEMPLATE_JSON = {};
             }
+            
             let finalRegions = {};
             for (let k in this.regionStr) {
               finalRegions[k] = this.regionStr[k].split(',').map(s => s.trim()).filter(s => s.length > 0);
