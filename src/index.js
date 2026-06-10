@@ -53,6 +53,9 @@ export default {
     const method = request.method;
 
     try {
+      // 屏蔽浏览器的图标报错请求
+      if (path === "/favicon.ico") return new Response(null, { status: 204 });
+      
       // ----------------------------------------
       // 1. 前端页面路由 (不受鉴权保护，由页面内部判断跳转)
       // ----------------------------------------
