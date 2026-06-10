@@ -4,7 +4,7 @@ export function renderHTML() {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>singbox配置中枢</title>
+  <title>sing-box 配置中心</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
   <style>
@@ -33,7 +33,7 @@ export function renderHTML() {
     <header class="flex justify-between items-center mb-8">
       <div>
         <h1 class="text-3xl font-bold tracking-tight text-white flex items-center gap-2">
-          FlowProxy <span class="text-xl font-normal text-blue-400">控制中心</span>
+          sing-box <span class="text-xl font-normal text-blue-400">配置中心</span>
         </h1>
         <p class="text-slate-400 mt-2 text-sm">Sing-Box 远程配置生成与分发引擎</p>
       </div>
