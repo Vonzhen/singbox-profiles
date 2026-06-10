@@ -195,15 +195,28 @@ export default {
           if (body.sub_links) {
             await db.saveUserSubLinks(env, currentUser.username, body.sub_links);
           }
-          // 仅管理员可以保存全局底座配置
+          
+          // ==========================================
+          // 核心修复：让后端正确接收并保存 GitHub 仓储凭证
+          // ==========================================
           if (currentUser.role === 'owner') {
-            const { REGION_KEYWORDS, BANNED_KEYWORDS, URLTEST_PARAMS, TEMPLATE_JSON } = body;
+            const { 
+              REGION_KEYWORDS, BANNED_KEYWORDS, URLTEST_PARAMS, TEMPLATE_JSON,
+              GITHUB_USER, GITHUB_REPO, GITHUB_BRANCH, GITHUB_TOKEN 
+            } = body;
+            
             const currentGlobal = await db.getGlobalConfig(env);
+            
             await db.saveGlobalConfig(env, {
               REGION_KEYWORDS: REGION_KEYWORDS || currentGlobal.REGION_KEYWORDS,
               BANNED_KEYWORDS: BANNED_KEYWORDS || currentGlobal.BANNED_KEYWORDS,
               URLTEST_PARAMS: URLTEST_PARAMS || currentGlobal.URLTEST_PARAMS,
-              TEMPLATE_JSON: TEMPLATE_JSON || currentGlobal.TEMPLATE_JSON
+              TEMPLATE_JSON: TEMPLATE_JSON || currentGlobal.TEMPLATE_JSON,
+              // 存入 GitHub 核心参数
+              GITHUB_USER: GITHUB_USER || currentGlobal.GITHUB_USER,
+              GITHUB_REPO: GITHUB_REPO || currentGlobal.GITHUB_REPO,
+              GITHUB_BRANCH: GITHUB_BRANCH || currentGlobal.GITHUB_BRANCH,
+              GITHUB_TOKEN: GITHUB_TOKEN !== undefined ? GITHUB_TOKEN : currentGlobal.GITHUB_TOKEN
             });
           }
           return jsonResponse({ success: true });
