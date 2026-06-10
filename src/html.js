@@ -1,10 +1,15 @@
+/**
+ * src/html.js
+ * 正统意图中心版控制面板
+ * 移除本地 JSON 框，回归 GitHub 凭证及仓库参数控制
+ */
 export function renderHTML() {
   return `<!DOCTYPE html>
 <html lang="zh-CN" class="dark">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>sing-box 配置中心</title>
+  <title>FlowProxy 控制中心</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
   <style>
@@ -44,12 +49,8 @@ export function renderHTML() {
           </div>
           
           <div class="flex gap-3 pt-2">
-            <button @click="handleLogin" :disabled="authLoading" class="flex-1 btn-primary text-center">
-              {{ authLoading ? '验证中...' : '登录' }}
-            </button>
-            <button @click="handleRegister" :disabled="authLoading" class="flex-1 bg-slate-700 hover:bg-slate-600 text-white padding py-2 rounded-lg text-sm font-medium transition-colors">
-              申请注册
-            </button>
+            <button @click="handleLogin" :disabled="authLoading" class="flex-1 btn-primary text-center">登录</button>
+            <button @click="handleRegister" :disabled="authLoading" class="flex-1 bg-slate-700 hover:bg-slate-600 text-white py-2 rounded-lg text-sm font-medium transition-colors">申请注册</button>
           </div>
         </div>
       </div>
@@ -60,11 +61,9 @@ export function renderHTML() {
         <div class="text-4xl mb-4">⏳</div>
         <h2 class="text-xl font-bold text-amber-400 mb-2">账号审核中</h2>
         <p class="text-slate-300 text-sm leading-relaxed mb-6">
-          你好 <strong>{{ user.username }}</strong>，你的账户已成功建立。系统目前开启了严格的安全审计制，请联系系统所有者（Owner）通过你的激活申请。
+          你好 <strong>{{ user.username }}</strong>，你的账户已建立。请联系系统所有者（Owner）通过你的激活申请。
         </p>
-        <button @click="handleLogout" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-sm">
-          退出当前账号
-        </button>
+        <button @click="handleLogout" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-sm">退出当前账号</button>
       </div>
     </div>
 
@@ -81,19 +80,14 @@ export function renderHTML() {
           </div>
         </div>
         <div class="flex items-center gap-3">
-          <button @click="saveSettings" :disabled="saving" class="btn-primary">
-            {{ saving ? '同步中...' : '保存修改' }}
-          </button>
-          <button @click="handleLogout" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-sm border border-slate-700">
-            安全登出
-          </button>
+          <button @click="saveSettings" :disabled="saving" class="btn-primary">保存修改</button>
+          <button @click="handleLogout" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-sm border border-slate-700">安全登出</button>
         </div>
       </header>
 
       <div class="flex border-b border-slate-700 mb-6">
-        <button class="tab-btn" :class="{ active: activeTab === 'config' }" @click="activeTab = 'config'">✈️ 节点订阅源</button>
-        <button v-if="user.role === 'owner'" class="tab-btn" :class="{ active: activeTab === 'global' }" @click="activeTab = 'global'">🌍 全局分流策略</button>
-        <button v-if="user.role === 'owner'" class="tab-btn" :class="{ active: activeTab === 'template' }" @click="activeTab = 'template'">📄 核心规则模板</button>
+        <button class="tab-btn" :class="{ active: activeTab === 'config' }" @click="activeTab = 'config'">✈️ 个人节点源</button>
+        <button v-if="user.role === 'owner'" class="tab-btn" :class="{ active: activeTab === 'global' }" @click="activeTab = 'global'">⚙️ 全局与仓库控制</button>
         <button v-if="user.role === 'owner'" class="tab-btn" :class="{ active: activeTab === 'admin' }" @click="activeTab = 'admin'">👥 用户准入审核</button>
       </div>
 
@@ -103,7 +97,7 @@ export function renderHTML() {
             <h2 class="text-xl font-semibold text-white">个人节点源: Sub-Store 机场阵列</h2>
             <button @click="addSubscription" class="text-sm bg-slate-700 hover:bg-slate-600 px-3 py-1 rounded text-white">+ 添加订阅源</button>
           </div>
-          <div v-if="sub_links.length === 0" class="text-center text-slate-500 py-6 text-sm">尚未配置节点，请点击右上角添加。</div>
+          <div v-if="sub_links.length === 0" class="text-center text-slate-500 py-6 text-sm">尚未配置节点。</div>
           
           <div v-for="(sub, index) in sub_links" :key="index" class="flex flex-wrap md:flex-nowrap items-center gap-3 bg-slate-800 p-3 rounded mb-2 border border-slate-700">
             <div class="w-full md:w-32">
@@ -124,10 +118,32 @@ export function renderHTML() {
       </div>
 
       <div v-show="activeTab === 'global' && user.role === 'owner'">
+        <div class="panel">
+          <h2 class="text-xl font-semibold mb-4 border-b border-slate-700 pb-2 text-white">🧠 大脑源: GitHub 仓库凭证</h2>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm text-slate-400 mb-1">GitHub 用户名 (USER)</label>
+              <input type="text" v-model="globalConfig.GITHUB_USER" class="input-box" placeholder="你的 GitHub ID">
+            </div>
+            <div>
+              <label class="block text-sm text-slate-400 mb-1">GitHub 仓库名 (REPO)</label>
+              <input type="text" v-model="globalConfig.GITHUB_REPO" class="input-box" placeholder="例如: singbox-profiles">
+            </div>
+            <div>
+              <label class="block text-sm text-slate-400 mb-1">分支名称 (BRANCH)</label>
+              <input type="text" v-model="globalConfig.GITHUB_BRANCH" class="input-box" placeholder="master 或 main">
+            </div>
+            <div>
+              <label class="block text-sm text-slate-400 mb-1">GitHub 访问令牌 (TOKEN - 私有仓必需)</label>
+              <input type="password" v-model="globalConfig.GITHUB_TOKEN" class="input-box" placeholder="ghp_xxxxxxxxxxxx">
+            </div>
+          </div>
+          <p class="text-xs text-slate-500 mt-2">提示：引擎将利用上述参数实时去你的 GitHub 仓库拉取 <code>profiles/main-profile.json</code> 骨架。</p>
+        </div>
+
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div class="panel h-full mb-0">
             <h2 class="text-xl font-semibold mb-4 border-b border-slate-700 pb-2 text-white">区域匹配关键字字典</h2>
-            <p class="text-xs text-slate-400 mb-4">使用半角逗号分隔，引擎将自动为匹配到的落地节点匹配并建立 UrlTest 自动化组。</p>
             <div class="space-y-3">
               <div v-for="(keywords, reg) in regionStr" :key="reg" class="flex flex-col">
                 <label class="text-sm font-medium text-slate-300 mb-1">{{ reg }} 区域</label>
@@ -136,39 +152,22 @@ export function renderHTML() {
             </div>
           </div>
           <div class="panel h-full mb-0">
-            <h2 class="text-xl font-semibold mb-4 border-b border-slate-700 pb-2 text-white">垃圾节点清洗与测速阈值</h2>
-            <div class="mb-5">
-              <label class="block text-sm text-slate-400 mb-1">无效节点屏蔽正则 (BANNED_KEYWORDS)</label>
-              <textarea v-model="globalConfig.BANNED_KEYWORDS" class="input-box text-sm font-mono h-20"></textarea>
+            <h2 class="text-xl font-semibold mb-4 border-b border-slate-700 pb-2 text-white">调度清洗与测速阈值</h2>
+            <div class="mb-4">
+              <label class="block text-sm text-slate-400 mb-1">无效节点屏蔽正则</label>
+              <textarea v-model="globalConfig.BANNED_KEYWORDS" class="input-box text-sm font-mono h-16"></textarea>
             </div>
             <div>
               <label class="block text-sm font-medium text-slate-300 mb-2 border-b border-slate-700 pb-1">UrlTest 组全局探针参数</label>
-              <div class="space-y-3">
-                <div>
-                  <label class="block text-xs text-slate-400 mb-1">探测 URL</label>
-                  <input type="text" v-model="globalConfig.URLTEST_PARAMS.url" class="input-box text-sm font-mono">
-                </div>
+              <div class="space-y-2">
+                <input type="text" v-model="globalConfig.URLTEST_PARAMS.url" class="input-box text-sm font-mono" placeholder="测速 URL">
                 <div class="flex gap-4">
-                  <div class="flex-1">
-                    <label class="block text-xs text-slate-400 mb-1">探测间隔 (Interval)</label>
-                    <input type="text" v-model="globalConfig.URLTEST_PARAMS.interval" class="input-box text-sm font-mono">
-                  </div>
-                  <div class="flex-1">
-                    <label class="block text-xs text-slate-400 mb-1">容差延迟 (Tolerance ms)</label>
-                    <input type="number" v-model="globalConfig.URLTEST_PARAMS.tolerance" class="input-box text-sm font-mono">
-                  </div>
+                  <input type="text" v-model="globalConfig.URLTEST_PARAMS.interval" class="input-box text-sm font-mono" placeholder="间隔 (如 3m)">
+                  <input type="number" v-model="globalConfig.URLTEST_PARAMS.tolerance" class="input-box text-sm font-mono" placeholder="容差 ms">
                 </div>
               </div>
             </div>
           </div>
-        </div>
-      </div>
-
-      <div v-show="activeTab === 'template' && user.role === 'owner'">
-        <div class="panel">
-          <h2 class="text-xl font-semibold mb-4 border-b border-slate-700 pb-2 text-white">Sing-Box 骨架大脑模板 (TEMPLATE_JSON)</h2>
-          <p class="text-xs text-slate-400 mb-4">在此处编排你的原生 DNS 服务器、DNS 规则及出站分流规则。在出站组内可直接声明占位符实现依赖注入。</p>
-          <textarea v-model="templateStr" class="input-box font-mono text-sm leading-relaxed h-[500px]" spellcheck="false" placeholder="输入原生 Sing-box 配置 JSON..."></textarea>
         </div>
       </div>
 
@@ -182,7 +181,6 @@ export function renderHTML() {
                   <th class="py-2 px-4">用户名</th>
                   <th class="py-2 px-4">系统权限</th>
                   <th class="py-2 px-4">状态标识</th>
-                  <th class="py-2 px-4">注册时间</th>
                   <th class="py-2 px-4 text-right">安全审计操作</th>
                 </tr>
               </thead>
@@ -195,11 +193,8 @@ export function renderHTML() {
                       ● {{ u.status === 'active' ? '已授权活跃' : '待激活审核' }}
                     </span>
                   </td>
-                  <td class="py-3 px-4 text-slate-400 text-xs">{{ formatDate(u.created_at) }}</td>
                   <td class="py-3 px-4 text-right">
-                    <button v-if="u.status === 'pending'" @click="approveUser(u.username)" class="bg-green-600 hover:bg-green-500 text-white text-xs px-3 py-1 rounded">
-                      准许激活入网
-                    </button>
+                    <button v-if="u.status === 'pending'" @click="approveUser(u.username)" class="bg-green-600 hover:bg-green-500 text-white text-xs px-3 py-1 rounded">准许激活</button>
                     <span v-else class="text-xs text-slate-500">-</span>
                   </td>
                 </tr>
@@ -210,16 +205,14 @@ export function renderHTML() {
       </div>
 
       <div class="panel mt-6 border-blue-950 bg-blue-950/20">
-        <h2 class="text-xl font-semibold mb-4 border-b border-blue-900/50 pb-2 text-blue-400">底层生成引擎接口联调</h2>
+        <h2 class="text-xl font-semibold mb-4 border-b border-blue-900/50 pb-2 text-blue-400">交付与配置中枢联调</h2>
         <div class="flex flex-col md:flex-row gap-4 items-center justify-between bg-slate-900/50 p-4 rounded-lg border border-slate-800 mb-4">
-          <div class="flex-grow w-full font-mono text-sm break-all text-green-400 select-all">
-            {{ clientUrl }}
-          </div>
-          <button @click="copyUrl" class="btn-primary whitespace-nowrap bg-green-600 hover:bg-green-500">复制订阅直链</button>
+          <div class="flex-grow w-full font-mono text-sm break-all text-green-400 select-all">{{ clientUrl }}</div>
+          <button @click="copyUrl" class="btn-primary whitespace-nowrap bg-green-600 hover:bg-green-500">复制订阅链接</button>
         </div>
         <div>
           <button @click="testEngine" :disabled="testing" class="w-full bg-slate-700 hover:bg-slate-600 text-white py-2 rounded text-sm font-medium transition-colors">
-            {{ testing ? '配置实时拼装运算中...' : '模拟当前用户拉取请求 (Debug 测试)' }}
+            {{ testing ? '正在连接 GitHub 并拼装节点...' : '触发客户端拉取请求测试 (Debug 模式)' }}
           </button>
           <div v-if="testLogs.length > 0" class="mt-3 bg-[#0c0c0c] border border-slate-700 rounded-lg p-3 h-52 overflow-y-auto font-mono text-xs text-slate-300">
             <div v-for="(log, i) in testLogs" :key="i" class="mb-1 pb-1 border-b border-slate-900/50 last:border-0">
@@ -247,10 +240,10 @@ export function renderHTML() {
           user: { username: '', role: '', status: '', client_token: '' },
           sub_links: [],
           globalConfig: {
+            GITHUB_USER: "", GITHUB_REPO: "", GITHUB_BRANCH: "master", GITHUB_TOKEN: "",
             BANNED_KEYWORDS: "",
             URLTEST_PARAMS: { url: "", interval: "", tolerance: 150 }
           },
-          templateStr: "",
           regionStr: { HK: "", TW: "", SG: "", JP: "", US: "" },
           adminUsers: [],
           testLogs: []
@@ -258,16 +251,12 @@ export function renderHTML() {
       },
       computed: {
         clientUrl() {
-          if (!this.user.client_token) return '账号未激活，无法分发直链';
+          if (!this.user.client_token) return '账号未激活';
           return \`\${window.location.origin}/api/generate?token=\${this.user.client_token}\`;
         }
       },
-      async mounted() {
-        await this.checkAuthStatus();
-      },
+      async mounted() { await this.checkAuthStatus(); },
       methods: {
-        formatDate(isoStr) { return isoStr ? new Date(isoStr).toLocaleString() : '-'; },
-        
         async checkAuthStatus() {
           try {
             const res = await fetch('/api/me');
@@ -280,12 +269,8 @@ export function renderHTML() {
               }
             } else {
               this.isLoggedIn = false;
-              this.user = { username: '', role: '', status: '', client_token: '' };
             }
-          } catch (e) { 
-            this.isLoggedIn = false; 
-            this.user = { username: '', role: '', status: '', client_token: '' };
-          }
+          } catch (e) { this.isLoggedIn = false; }
         },
 
         async handleLogin() {
@@ -298,12 +283,8 @@ export function renderHTML() {
               body: JSON.stringify(this.authForm)
             });
             const data = await res.json();
-            if (res.ok && data.success) {
-              await this.checkAuthStatus();
-            } else {
-              alert(data.error || "登录失败，凭证异常");
-            }
-          } catch (e) { alert("网络交互异常"); }
+            if (res.ok && data.success) { await this.checkAuthStatus(); } else { alert(data.error || "登录失败"); }
+          } catch (e) { alert("网络异常"); }
           this.authLoading = false;
         },
 
@@ -318,14 +299,9 @@ export function renderHTML() {
             });
             const data = await res.json();
             if (res.ok && data.success) {
-              if (data.isFirstUser) {
-                alert("🎉 初始化建站成功！你是系统首位所有者(Owner)，已自动完成激活动作，请直接执行登录。");
-              } else {
-                alert("📌 注册申请已提交。系统当前处于安全审查状态，请联系管理员审核。");
-              }
-            } else {
-              alert(data.error || "注册阻断");
-            }
+              if (data.isFirstUser) { alert("🎉 初始化建站成功！你是系统首位 Owner，已自动激活，请执行登录。"); }
+              else { alert("📌 注册申请已提交，请联系管理员审核。"); }
+            } else { alert(data.error); }
           } catch (e) { alert("注册异常"); }
           this.authLoading = false;
         },
@@ -333,8 +309,7 @@ export function renderHTML() {
         async handleLogout() {
           await fetch('/api/auth/logout', { method: 'POST' });
           this.isLoggedIn = false;
-          this.user = { username: '', role: '', status: '', client_token: '' };
-          this.authForm = { username: '', password: '' };
+          this.user = {};
         },
 
         async loadSettings() {
@@ -344,16 +319,19 @@ export function renderHTML() {
             this.sub_links = data.sub_links || [];
             
             if (this.user.role === 'owner') {
+              this.globalConfig.GITHUB_USER = data.GITHUB_USER || "";
+              this.globalConfig.GITHUB_REPO = data.GITHUB_REPO || "";
+              this.globalConfig.GITHUB_BRANCH = data.GITHUB_BRANCH || "master";
+              this.globalConfig.GITHUB_TOKEN = data.GITHUB_TOKEN || "";
               this.globalConfig.BANNED_KEYWORDS = data.BANNED_KEYWORDS || "";
               this.globalConfig.URLTEST_PARAMS = data.URLTEST_PARAMS || { url: "", interval: "", tolerance: 150 };
-              this.templateStr = data.TEMPLATE_JSON ? JSON.stringify(data.TEMPLATE_JSON, null, 2) : "";
               if (data.REGION_KEYWORDS) {
                 for (let k in this.regionStr) {
                   this.regionStr[k] = data.REGION_KEYWORDS[k] ? data.REGION_KEYWORDS[k].join(', ') : "";
                 }
               }
             }
-          } catch (e) { console.error("加载配置失败", e); }
+          } catch (e) {}
         },
 
         async saveSettings() {
@@ -361,24 +339,15 @@ export function renderHTML() {
           let payload = { sub_links: this.sub_links };
 
           if (this.user.role === 'owner') {
-            if (this.templateStr.trim() !== "") {
-              try {
-                payload.TEMPLATE_JSON = JSON.parse(this.templateStr);
-              } catch (err) {
-                alert("❌ 保存失败：【核心规则模板】存在 JSON 语法错误！\\n" + err.message);
-                this.activeTab = 'template';
-                this.saving = false;
-                return;
-              }
-            } else {
-              payload.TEMPLATE_JSON = {};
-            }
-            
             let finalRegions = {};
             for (let k in this.regionStr) {
               finalRegions[k] = this.regionStr[k].split(',').map(s => s.trim()).filter(s => s.length > 0);
             }
             payload.REGION_KEYWORDS = finalRegions;
+            payload.GITHUB_USER = this.globalConfig.GITHUB_USER;
+            payload.GITHUB_REPO = this.globalConfig.GITHUB_REPO;
+            payload.GITHUB_BRANCH = this.globalConfig.GITHUB_BRANCH;
+            payload.GITHUB_TOKEN = this.globalConfig.GITHUB_TOKEN;
             payload.BANNED_KEYWORDS = this.globalConfig.BANNED_KEYWORDS;
             payload.URLTEST_PARAMS = this.globalConfig.URLTEST_PARAMS;
           }
@@ -398,7 +367,7 @@ export function renderHTML() {
           try {
             const res = await fetch('/api/admin/users');
             if (res.ok) this.adminUsers = await res.json();
-          } catch (e) { console.error(e); }
+          } catch (e) {}
         },
 
         async approveUser(target_username) {
@@ -409,39 +378,34 @@ export function renderHTML() {
               body: JSON.stringify({ target_username })
             });
             if (res.ok) {
-              alert(\`已成功激活用户 [\${target_username}] 准入许可。\`);
+              alert(\`已成功激活用户 [\${target_username}]。\`);
               await this.loadAdminUsers();
             }
-          } catch (e) { alert("审核过账故障"); }
+          } catch (e) {}
         },
 
         addSubscription() { this.sub_links.push({ name: "", url: "", enabled: true }); },
         removeSubscription(index) { this.sub_links.splice(index, 1); },
-        
         async copyUrl() {
-          if (!this.user.client_token) return;
           try {
             await navigator.clipboard.writeText(this.clientUrl);
-            alert("客户端分发链接已复制到系统剪贴板。");
-          } catch (err) { alert("浏览器阻断，请手动全选复制。"); }
+            alert("分发链接已复制。");
+          } catch (err) {}
         },
 
         async testEngine() {
           this.testing = true;
-          this.testLogs = ["建立边缘模拟连接通道..."];
+          this.testLogs = ["建立边缘模拟连接..."];
           try {
             const res = await fetch(\`/api/generate?token=\${this.user.client_token}&debug=1\`);
             const result = await res.json();
-            if (res.ok && result.logs) {
-              this.testLogs = result.logs;
-            } else {
-              this.testLogs.push("配置编译成功，透传未返回 Debug 级状态记录。");
-            }
-          } catch (e) { this.testLogs.push("致命缺陷：引擎计算通道中断。"); }
+            if (res.ok && result.logs) { this.testLogs = result.logs; }
+            else { this.testLogs.push(result.error || "未返回 Debug 日志。"); }
+          } catch (e) { this.testLogs.push("引擎故障。"); }
           this.testing = false;
         }
       }
-    }).mount('#app');  
+    }).mount('#app');
   </script>
 </body>
 </html>`;
