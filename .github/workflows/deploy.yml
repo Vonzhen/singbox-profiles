@@ -1,22 +1,20 @@
-name: 皇家设计院·自动部署中枢
+name: Deploy Worker
 
 on:
   push:
     branches:
       - master
-    paths:
-      - 'src/**'
-      - 'wrangler.toml' # 只要这二个核心区动了，立刻启动自动化施工
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
-      - name: 1. 调取设计院档案
+      - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: 2. 自动化施工 (Deploy to CF)
+      - name: Deploy to Cloudflare Workers
         uses: cloudflare/wrangler-action@v3
         with:
-          apiToken: ${{ secrets.CF_API_TOKEN }} # 别人需在 GitHub Secrets 存入此私章
-          command: deploy
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          # 默认会读取根目录下的 wrangler.toml 并上传 src 目录中的代码
