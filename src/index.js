@@ -160,6 +160,28 @@ export default {
       const currentUser = await getCurrentUser(request, env);
       if (!currentUser) return jsonResponse({ error: "未登录" }, 401);
 
+      // ====== 🚀 新增：客户端订阅 Token 异步重置接口 ======
+      if (path === "/api/auth/reset_token" && method === "POST") {
+        const oldToken = currentUser.client_token;
+        const newToken = db.generateToken(); // 生成高强度新 Token
+
+        // 1. 如果存在旧的 Token 映射，执行物理剔除，让旧订阅瞬间报废
+        if (oldToken) {
+          await env.DB.delete(`token:${oldToken}`);
+        }
+
+        // 2. 解构剥离出核心用户数据，原地覆盖写入新 Token
+        const { username, ...userData } = currentUser;
+        userData.client_token = newToken;
+        await db.saveUser(env, username, userData);
+
+        // 3. 建立新 Token -> 用户名的反向 O(1) 极速检索映射
+        await db.linkTokenToUser(env, newToken, username);
+
+        return jsonResponse({ success: true, client_token: newToken });
+      }
+      // ===================================================
+
       // --- 获取当前用户信息与状态 ---
       if (path === "/api/me" && method === "GET") {
         return jsonResponse({ 
