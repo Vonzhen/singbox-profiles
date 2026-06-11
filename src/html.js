@@ -1,6 +1,6 @@
 /**
  * src/html.js
- * 带有机场精准引流授权 (Allowed Regions) 的控制台
+ * 带有客户端直链重置熔断功能的控制台
  */
 export function renderHTML() {
   return `<!DOCTYPE html>
@@ -36,7 +36,6 @@ export function renderHTML() {
       <div class="bg-slate-800 border border-slate-700 p-8 rounded-xl shadow-xl w-full max-w-md">
         <h2 class="text-2xl font-bold text-white mb-2 text-center">sing-box 配置中心</h2>
         <p class="text-slate-400 text-xs text-center mb-6">无服务器多用户 Sing-Box 配置中枢</p>
-        
         <div class="space-y-4">
           <div>
             <label class="block text-sm text-slate-400 mb-1">用户名</label>
@@ -46,7 +45,6 @@ export function renderHTML() {
             <label class="block text-sm text-slate-400 mb-1">密码</label>
             <input type="password" v-model="authForm.password" class="input-box" placeholder="输入密码">
           </div>
-          
           <div class="flex gap-3 pt-2">
             <button @click="handleLogin" :disabled="authLoading" class="flex-1 btn-primary text-center">登录</button>
             <button @click="handleRegister" :disabled="authLoading" class="flex-1 bg-slate-700 hover:bg-slate-600 text-white py-2 rounded-lg text-sm font-medium transition-colors">申请注册</button>
@@ -121,7 +119,6 @@ export function renderHTML() {
                 <input type="checkbox" :value="reg" v-model="sub.allowed_regions" class="w-3.5 h-3.5 text-blue-500 bg-slate-900 border-slate-600 rounded focus:ring-blue-500 focus:ring-2">
                 {{ reg }}
               </label>
-              <span v-if="Object.keys(regionStr).length === 0" class="text-xs text-amber-500">请先在全局配置中设定区域字典</span>
             </div>
           </div>
         </div>
@@ -217,7 +214,12 @@ export function renderHTML() {
         <h2 class="text-xl font-semibold mb-4 border-b border-blue-900/50 pb-2 text-blue-400">交付与配置中枢联调</h2>
         <div class="flex flex-col md:flex-row gap-4 items-center justify-between bg-slate-900/50 p-4 rounded-lg border border-slate-800 mb-4">
           <div class="flex-grow w-full font-mono text-sm break-all text-green-400 select-all">{{ clientUrl }}</div>
-          <button @click="copyUrl" class="btn-primary whitespace-nowrap bg-green-600 hover:bg-green-500">复制订阅链接</button>
+          <div class="flex gap-2 w-full md:w-auto">
+            <button @click="copyUrl" class="btn-primary whitespace-nowrap bg-green-600 hover:bg-green-500">复制订阅链接</button>
+            <button @click="resetToken" :disabled="resetting" class="px-3 py-2 bg-red-600/20 hover:bg-red-600 border border-red-500 hover:border-red-600 text-red-200 hover:text-white rounded-lg text-sm transition-colors whitespace-nowrap">
+              {{ resetting ? '重置中...' : '重置 Token' }}
+            </button>
+          </div>
         </div>
         <div>
           <button @click="testEngine" :disabled="testing" class="w-full bg-slate-700 hover:bg-slate-600 text-white py-2 rounded text-sm font-medium transition-colors">
@@ -244,6 +246,7 @@ export function renderHTML() {
           authLoading: false,
           saving: false,
           testing: false,
+          resetting: false, // 联动异步控制状态
           activeTab: 'config',
           authForm: { username: '', password: '' },
           user: { username: '', role: '', status: '', client_token: '' },
@@ -278,12 +281,8 @@ export function renderHTML() {
               }
             } else {
               this.isLoggedIn = false;
-              this.user = { username: '', role: '', status: '', client_token: '' };
             }
-          } catch (e) { 
-            this.isLoggedIn = false;
-            this.user = { username: '', role: '', status: '', client_token: '' };
-          }
+          } catch (e) { this.isLoggedIn = false; }
         },
 
         async handleLogin() {
@@ -330,7 +329,6 @@ export function renderHTML() {
             const res = await fetch('/api/settings');
             const data = await res.json();
             
-            // 兼容加载，为没有 allowed_regions 的旧数据补充默认全选
             this.sub_links = (data.sub_links || []).map(sub => {
               if (!sub.allowed_regions) sub.allowed_regions = Object.keys(this.regionStr);
               return sub;
@@ -381,6 +379,25 @@ export function renderHTML() {
           this.saving = false;
         },
 
+        // ====== 🚀 新增：前端异步重置 Token 触发函数 ======
+        async resetToken() {
+          const msg = "⚠️ 极其危险的操作警告！\\n\\n一旦执行重置 Token：\\n1. 当前正在使用该订阅直链的所有物理设备（Apple TV、OpenWrt 路由器、手机等）将会瞬间被边缘断开、拉取报错！\\n2. 旧的链接将永久失效且不可找回。\\n\\n你确定要强制吊销旧密钥并下发新 Token 吗？";
+          if (!confirm(msg)) return;
+
+          this.resetting = true;
+          try {
+            const res = await fetch('/api/auth/reset_token', { method: 'POST' });
+            const data = await res.json();
+            if (res.ok && data.success) {
+              this.user.client_token = data.client_token; // 实时重绑 Vue 节点响应式计算
+              alert("🎉 密钥吊销过账成功！旧链接已当场报废。请及时更新你所有客户端设备上的订阅地址。");
+            } else {
+              alert(data.error || "熔断过账失败");
+            }
+          } catch (e) { alert("网关通道中断，重置未生效"); }
+          this.resetting = false;
+        },
+
         async loadAdminUsers() {
           try {
             const res = await fetch('/api/admin/users');
@@ -405,7 +422,7 @@ export function renderHTML() {
         addSubscription() { 
           this.sub_links.push({ 
             name: "", url: "", enabled: true, 
-            allowed_regions: Object.keys(this.regionStr) // 默认勾选字典里的所有区域
+            allowed_regions: Object.keys(this.regionStr)
           }); 
         },
         removeSubscription(index) { this.sub_links.splice(index, 1); },
@@ -428,7 +445,7 @@ export function renderHTML() {
           this.testing = false;
         }
       }
-    }).mount('#app');
+    }).mount('#app'); // 拧钥匙打火
   </script>
 </body>
 </html>`;
