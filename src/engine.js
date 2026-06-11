@@ -1,6 +1,6 @@
 /**
  * src/engine.js
- * 意图驱动型配置生成引擎 (GitHub 实时联动版)
+ * 纯正意图驱动版：保留区域二维隔离、加入授权控制网闸，执行 x_rule 注入
  */
 
 function parseRule(ruleStr) {
@@ -19,7 +19,11 @@ function validateReferences(config) {
   }
   config.outbounds.forEach(o => {
     if (Array.isArray(o.outbounds)) {
-      o.outbounds = o.outbounds.filter(tag => validTags.has(tag));
+      o.outbounds = o.outbounds.filter(tag => {
+        const isValid = validTags.has(tag);
+        if (!isValid) console.warn(`[Validate] 剔除无效引用: [${o.tag}] -> "${tag}"`);
+        return isValid;
+      });
     }
   });
   if (config.dns && Array.isArray(config.dns.servers)) {
@@ -29,18 +33,15 @@ function validateReferences(config) {
   }
 }
 
-/**
- * 核心引擎拼装流水线
- */
 export async function generateConfig(userSubLinks, globalConfig, isDebug) {
   try {
     const debugLogs = [];
     const log = (msg) => { if (isDebug) { console.log(msg); debugLogs.push(msg); } };
 
-    log("--- 启动配置生成引擎 (意图中心版) ---");
+    log("--- 启动配置生成引擎 (原版分离逻辑) ---");
 
     // ==========================================
-    // 核心微调：利用网页配好的凭证实时拉取 GitHub 骨架
+    // 1. 获取远程模板
     // ==========================================
     const user = globalConfig.GITHUB_USER;
     const repo = globalConfig.GITHUB_REPO;
@@ -48,14 +49,12 @@ export async function generateConfig(userSubLinks, globalConfig, isDebug) {
     const token = globalConfig.GITHUB_TOKEN;
 
     if (!user || !repo) {
-      throw new Error("检测到系统所有者尚未在管理面板中配妥 GitHub 仓库凭证，拒绝生成。");
+      throw new Error("请先在管理面板中配妥 GitHub 仓库参数。");
     }
 
-    log(`[GitHub 联动] 正在尝试连通：https://raw.githubusercontent.com/${user}/${repo}/${branch}/profiles/main-profile.json`);
-
     const githubUrl = `https://raw.githubusercontent.com/${user}/${repo}/${branch}/profiles/main-profile.json`;
-    
-    // 构建带凭证的私有仓请求头
+    log(`[GitHub] 正在连通：${githubUrl}`);
+
     const ghHeaders = { "User-Agent": "SingBox-Config-Builder" };
     if (token) {
       ghHeaders["Authorization"] = `token ${token}`;
@@ -63,15 +62,12 @@ export async function generateConfig(userSubLinks, globalConfig, isDebug) {
     }
 
     const configRes = await fetch(`${githubUrl}?t=${Date.now()}`, { headers: ghHeaders });
-    if (!configRes.ok) {
-      throw new Error(`GitHub 意图文件拉取惨败，状态码: ${configRes.status}。请核实 Web 面板中的 Token 及路径。`);
-    }
-    
+    if (!configRes.ok) throw new Error(`远程骨架拉取失败: HTTP ${configRes.status}`);
     let config = await configRes.json();
-    log(`[GitHub 成功] main-profile.json 骨架捕获成功！`);
+    log(`[GitHub] 骨架捕获成功！`);
 
     // ==========================================
-    // 节点加载与清洗流程 (完美平移你的心血)
+    // 2. 环境初始化
     // ==========================================
     const REGION_KEYWORDS = globalConfig.REGION_KEYWORDS || {};
     const FLAG_MAP = { "HK": "🇭🇰", "SG": "🇸🇬", "JP": "🇯🇵", "US": "🇺🇸", "TW": "🇹🇼" };
@@ -82,9 +78,13 @@ export async function generateConfig(userSubLinks, globalConfig, isDebug) {
     const projectMap = new Map();
     const allRealNodes = [];
 
+    // ==========================================
+    // 3. 并发拉取并清洗单节点数据
+    // ==========================================
     await Promise.all(activeConfigs.map(async (p) => {
       try {
         const subUrl = p.url.includes('?') ? `${p.url}&t=${Date.now()}` : `${p.url}?t=${Date.now()}`;
+        // 注意：移除了 cache: "no-store" 防报错
         const res = await fetch(subUrl, { headers: { "User-Agent": "Mozilla/5.0 (Clash)" } });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         
@@ -106,28 +106,40 @@ export async function generateConfig(userSubLinks, globalConfig, isDebug) {
         });
 
         if (nodes.length > 0) {
-          projectMap.set(p.name, nodes);
+          // 保存节点，并绑定该机场 UI 上授权的引流区域 (兼容旧数据)
+          const allowed = p.allowed_regions || Object.keys(REGION_KEYWORDS);
+          projectMap.set(p.name, { nodes, allowed_regions: allowed });
           allRealNodes.push(...nodes);
-          log(`[节点加载] [${p.name}]: 加载 ${nodes.length} 个干净节点`);
+          log(`[节点加载] 机场 [${p.name}]: 加载 ${nodes.length} 个干净节点。`);
         }
       } catch (e) {
-        log(`[节点加载] [${p.name}] 异常: ${e.message}`);
+        log(`[节点加载] 机场 [${p.name}] 异常: ${e.message}`);
       }
     }));
 
-    // 构建动态策略组
+    // ==========================================
+    // 4. 按机场及区域构建自动化策略组 (原汁原味二维隔离)
+    // ==========================================
     const dynamicGroups = [];
     const regionalGroupsMap = {};
     Object.keys(REGION_KEYWORDS).forEach(reg => { regionalGroupsMap[reg] = []; });
 
-    for (const [pName, nodes] of projectMap) {
+    for (const [pName, pData] of projectMap) {
+      const { nodes, allowed_regions } = pData;
+      
       Object.keys(REGION_KEYWORDS).forEach(reg => {
+        // 核心网闸补丁：如果当前区域不在该机场的 UI 授权名单里，彻底拦截它！
+        if (!allowed_regions.includes(reg)) {
+          return;
+        }
+
         const matchedTags = nodes.filter(n => {
           const tagUpper = n.tag.toUpperCase();
           return REGION_KEYWORDS[reg].some(kw => tagUpper.includes(kw));
         }).map(n => n.tag);
 
         if (matchedTags.length > 0) {
+          // 命名严格回归原版，如: 🇭🇰 HK-机场名
           const groupTag = `${FLAG_MAP[reg] || ''} ${reg}-${pName}`.trim();
           dynamicGroups.push({
             tag: groupTag, 
@@ -143,9 +155,11 @@ export async function generateConfig(userSubLinks, globalConfig, isDebug) {
       });
     }
 
-    log(`[策略构建] 已组装 ${dynamicGroups.length} 个区域级 urltest 分组`);
+    log(`[策略构建] 已生成 ${dynamicGroups.length} 个独立的机场级区域 urltest 分组`);
 
-    // 模板注入
+    // ==========================================
+    // 5. 模板驱动注入逻辑 (处理 x_rule，完全镜像原版)
+    // ==========================================
     const allGeneratedRegionalTags = Object.values(regionalGroupsMap).flat();
 
     if (Array.isArray(config.outbounds)) {
@@ -157,6 +171,7 @@ export async function generateConfig(userSubLinks, globalConfig, isDebug) {
         let keys = ["🗽 节点选择"];
 
         if (!rule) {
+          log(`[注入回退] 分组 "${group.tag}" 执行兼容性回退`);
           const t = group.tag;
           if (t === "🗽 节点选择") {
             const others = allRealNodes.filter(n => 
@@ -169,9 +184,10 @@ export async function generateConfig(userSubLinks, globalConfig, isDebug) {
           else if (t === "📹️ Viu") keys.push(...(regionalGroupsMap["HK"] || []));
           else if (t === "🎞 Emby") keys.push("🎯 全球直连", ...(regionalGroupsMap["HK"] || []), ...(regionalGroupsMap["SG"] || []), ...(regionalGroupsMap["US"] || []));
           else if (t === "🍎 Apple" || t === "🐧 Tencent") keys.push("🎯 全球直连");
-          else if (["🐟 漏网之鱼", "🌐 GLOBAL"].includes(t)) { }
+          else if (["🐟 漏网之鱼", "🌐 GLOBAL"].includes(t)) { /* 保持仅含总控 */ }
           else keys.push(...allGeneratedRegionalTags);
         } else {
+          log(`[规则注入] 分组 "${group.tag}" 命中规则: ${ruleStr}`);
           switch (rule.mode) {
             case 'keep': delete group.x_rule; return group;
             case 'direct_only': keys = ["🎯 全球直连"]; break;
@@ -196,6 +212,9 @@ export async function generateConfig(userSubLinks, globalConfig, isDebug) {
       });
     }
 
+    // ==========================================
+    // 6. 最终合并配置组装
+    // ==========================================
     const seen = new Set();
     const uniqueNodes = allRealNodes.filter(n => !seen.has(n.tag) && seen.add(n.tag));
     
