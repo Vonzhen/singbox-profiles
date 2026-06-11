@@ -7,11 +7,6 @@ import { generateConfig } from './engine.js';
 import { renderHTML } from './html.js';
 import * as db from './db.js';
 
-// ==========================================
-// 辅助工具函数
-// ==========================================
-
-// 解析请求头中的 Cookie
 function parseCookies(request) {
   const cookieHeader = request.headers.get('Cookie');
   if (!cookieHeader) return {};
@@ -21,7 +16,6 @@ function parseCookies(request) {
   }, {});
 }
 
-// 统一的 JSON 响应格式
 function jsonResponse(data, status = 200, extraHeaders = {}) {
   return new Response(JSON.stringify(data), {
     status,
@@ -29,7 +23,6 @@ function jsonResponse(data, status = 200, extraHeaders = {}) {
   });
 }
 
-// 鉴权中间件：获取当前登录用户
 async function getCurrentUser(request, env) {
   const cookies = parseCookies(request);
   const sessionId = cookies['session_id'];
@@ -42,10 +35,6 @@ async function getCurrentUser(request, env) {
   return user ? { username, ...user } : null;
 }
 
-// ==========================================
-// 主执行流程
-// ==========================================
-
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -53,48 +42,42 @@ export default {
     const method = request.method;
 
     try {
-      // 屏蔽浏览器的图标报错请求
+      // 0. 屏蔽浏览器的无意义请求
       if (path === "/favicon.ico") return new Response(null, { status: 204 });
-      
-      // ----------------------------------------
-      // 1. 前端页面路由 (不受鉴权保护，由页面内部判断跳转)
-      // ----------------------------------------
+
+      // 1. 前端页面路由
       if (method === "GET" && path === "/") {
         return new Response(renderHTML(), {
           headers: { "Content-Type": "text/html; charset=utf-8" },
         });
       }
 
-      // ----------------------------------------
-      // 2. 客户端订阅拉取接口 (无状态 Token 鉴权)
-      // ----------------------------------------
+      // 2. 客户端订阅拉取接口 (纯 Token 鉴权)
       if (method === "GET" && path === "/api/generate") {
         const clientToken = url.searchParams.get("token");
         const isDebug = url.searchParams.get("debug") === "1";
 
         if (!clientToken) return new Response("Missing token", { status: 401 });
 
-        // 核心改造：通过 Token 反向查找用户
         const user = await db.getUserByClientToken(env, clientToken);
         if (!user || user.status !== 'active') {
           return new Response("Unauthorized or pending access", { status: 403 });
         }
 
-        // 提取该用户的隔离数据和全局数据，传递给引擎
         const userSubLinks = await db.getUserSubLinks(env, user.username);
         const globalConfig = await db.getGlobalConfig(env);
 
-        // 调用引擎 (引擎部分将在后续微调以接收这些分离的数据)
         return await generateConfig(userSubLinks, globalConfig, isDebug);
       }
 
-      // ----------------------------------------
-      // 3. 登录与注册接口 (Auth APIs)
-      // ----------------------------------------
-      if (path.startsWith("/api/auth/")) {
-        const body = method === "POST" ? await request.json() : {};
+      // 3. 登录与注册基础鉴权接口
+      // 【核心修复】：精准匹配路由，避免空 POST 请求被错误解析
+      if (path === "/api/auth/register" || path === "/api/auth/login" || path === "/api/auth/logout") {
+        let body = {};
+        if (method === "POST" && path !== "/api/auth/logout") {
+          body = await request.json();
+        }
         
-        // --- 注册 ---
         if (path === "/api/auth/register" && method === "POST") {
           const { username, password } = body;
           if (!username || !password) return jsonResponse({ error: "参数不完整" }, 400);
@@ -105,12 +88,11 @@ export default {
           const allUsers = await db.listAllUsers(env);
           const isFirstUser = allUsers.length === 0;
           
-          // 第一个注册的用户直接成为 owner 并激活
           const newUser = {
             password_hash: await db.hashPassword(password),
             role: isFirstUser ? 'owner' : 'member',
             status: isFirstUser ? 'active' : 'pending',
-            client_token: null, // 审核通过后生成
+            client_token: null, 
             created_at: new Date().toISOString()
           };
 
@@ -123,7 +105,6 @@ export default {
           return jsonResponse({ success: true, isFirstUser });
         }
 
-        // --- 登录 ---
         if (path === "/api/auth/login" && method === "POST") {
           const { username, password } = body;
           const user = await db.getUser(env, username);
@@ -135,7 +116,6 @@ export default {
             return jsonResponse({ error: "用户不存在或密码错误" }, 401);
           }
 
-          // 登录成功，下发 Session
           const sessionId = db.generateToken();
           await db.createSession(env, sessionId, username);
 
@@ -144,7 +124,6 @@ export default {
           });
         }
 
-        // --- 登出 ---
         if (path === "/api/auth/logout" && method === "POST") {
           const cookies = parseCookies(request);
           if (cookies['session_id']) await db.deleteSession(env, cookies['session_id']);
@@ -155,34 +134,26 @@ export default {
       }
 
       // ----------------------------------------
-      // 4. 需要登录态的内部控制台接口 (Settings & Admin)
+      // 4. 需要登录态的高级操作与控制台接口
       // ----------------------------------------
       const currentUser = await getCurrentUser(request, env);
       if (!currentUser) return jsonResponse({ error: "未登录" }, 401);
 
-      // ====== 🚀 新增：客户端订阅 Token 异步重置接口 ======
+      // 【核心功能】：强力熔断旧 Token，换发新 Token
       if (path === "/api/auth/reset_token" && method === "POST") {
         const oldToken = currentUser.client_token;
-        const newToken = db.generateToken(); // 生成高强度新 Token
+        const newToken = db.generateToken();
 
-        // 1. 如果存在旧的 Token 映射，执行物理剔除，让旧订阅瞬间报废
-        if (oldToken) {
-          await env.DB.delete(`token:${oldToken}`);
-        }
+        if (oldToken) await env.DB.delete(`token:${oldToken}`);
 
-        // 2. 解构剥离出核心用户数据，原地覆盖写入新 Token
         const { username, ...userData } = currentUser;
         userData.client_token = newToken;
         await db.saveUser(env, username, userData);
-
-        // 3. 建立新 Token -> 用户名的反向 O(1) 极速检索映射
         await db.linkTokenToUser(env, newToken, username);
 
         return jsonResponse({ success: true, client_token: newToken });
       }
-      // ===================================================
 
-      // --- 获取当前用户信息与状态 ---
       if (path === "/api/me" && method === "GET") {
         return jsonResponse({ 
           username: currentUser.username, 
@@ -192,18 +163,15 @@ export default {
         });
       }
 
-      // 阻止未激活用户操作核心数据
       if (currentUser.status !== 'active') {
         return jsonResponse({ error: "账号审核中，限制访问" }, 403);
       }
 
-      // --- 读写业务数据 ---
       if (path === "/api/settings") {
         if (method === "GET") {
           const sub_links = await db.getUserSubLinks(env, currentUser.username);
           let responseData = { sub_links };
           
-          // 仅管理员返回全局配置
           if (currentUser.role === 'owner') {
             const globalConfig = await db.getGlobalConfig(env);
             responseData = { ...responseData, ...globalConfig };
@@ -213,31 +181,23 @@ export default {
         
         if (method === "POST") {
           const body = await request.json();
-          // 所有活跃用户都可以保存自己的机场
           if (body.sub_links) {
             await db.saveUserSubLinks(env, currentUser.username, body.sub_links);
           }
-          
-          // ==========================================
-          // 核心修复：让后端正确接收并保存 GitHub 仓储凭证
-          // ==========================================
           if (currentUser.role === 'owner') {
             const { 
               REGION_KEYWORDS, BANNED_KEYWORDS, URLTEST_PARAMS, TEMPLATE_JSON,
-              GITHUB_USER, GITHUB_REPO, GITHUB_BRANCH, GITHUB_TOKEN 
+              GITHUB_USER, GITHUB_REPO, GITHUB_BRANCH, GITHUB_TOKEN
             } = body;
-            
             const currentGlobal = await db.getGlobalConfig(env);
-            
             await db.saveGlobalConfig(env, {
               REGION_KEYWORDS: REGION_KEYWORDS || currentGlobal.REGION_KEYWORDS,
               BANNED_KEYWORDS: BANNED_KEYWORDS || currentGlobal.BANNED_KEYWORDS,
               URLTEST_PARAMS: URLTEST_PARAMS || currentGlobal.URLTEST_PARAMS,
               TEMPLATE_JSON: TEMPLATE_JSON || currentGlobal.TEMPLATE_JSON,
-              // 存入 GitHub 核心参数
-              GITHUB_USER: GITHUB_USER || currentGlobal.GITHUB_USER,
-              GITHUB_REPO: GITHUB_REPO || currentGlobal.GITHUB_REPO,
-              GITHUB_BRANCH: GITHUB_BRANCH || currentGlobal.GITHUB_BRANCH,
+              GITHUB_USER: GITHUB_USER !== undefined ? GITHUB_USER : currentGlobal.GITHUB_USER,
+              GITHUB_REPO: GITHUB_REPO !== undefined ? GITHUB_REPO : currentGlobal.GITHUB_REPO,
+              GITHUB_BRANCH: GITHUB_BRANCH !== undefined ? GITHUB_BRANCH : currentGlobal.GITHUB_BRANCH,
               GITHUB_TOKEN: GITHUB_TOKEN !== undefined ? GITHUB_TOKEN : currentGlobal.GITHUB_TOKEN
             });
           }
@@ -245,11 +205,9 @@ export default {
         }
       }
 
-      // --- 超级管理员专属：用户审核接口 ---
       if (path.startsWith("/api/admin/") && currentUser.role === 'owner') {
         if (path === "/api/admin/users" && method === "GET") {
           const users = await db.listAllUsers(env);
-          // 脱敏处理，不返回密码哈希
           const safeUsers = users.map(({ password_hash, ...u }) => u);
           return jsonResponse(safeUsers);
         }
@@ -268,7 +226,6 @@ export default {
         }
       }
 
-      // 兜底路由
       return jsonResponse({ error: "Not Found" }, 404);
 
     } catch (e) {
