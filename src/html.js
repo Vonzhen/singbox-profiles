@@ -1,7 +1,6 @@
 /**
  * src/html.js
- * 正统意图中心版控制面板
- * 移除本地 JSON 框，回归 GitHub 凭证及仓库参数控制
+ * 带有机场精准引流授权 (Allowed Regions) 的控制台
  */
 export function renderHTML() {
   return `<!DOCTYPE html>
@@ -9,7 +8,7 @@ export function renderHTML() {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>FlowProxy 控制中心</title>
+  <title>sing-box 配置中心</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
   <style>
@@ -35,7 +34,7 @@ export function renderHTML() {
     
     <div v-if="!isLoggedIn" class="min-h-[60vh] flex flex-col items-center justify-center">
       <div class="bg-slate-800 border border-slate-700 p-8 rounded-xl shadow-xl w-full max-w-md">
-        <h2 class="text-2xl font-bold text-white mb-2 text-center">FlowProxy 控制中心</h2>
+        <h2 class="text-2xl font-bold text-white mb-2 text-center">sing-box 配置中心</h2>
         <p class="text-slate-400 text-xs text-center mb-6">无服务器多用户 Sing-Box 配置中枢</p>
         
         <div class="space-y-4">
@@ -61,9 +60,9 @@ export function renderHTML() {
         <div class="text-4xl mb-4">⏳</div>
         <h2 class="text-xl font-bold text-amber-400 mb-2">账号审核中</h2>
         <p class="text-slate-300 text-sm leading-relaxed mb-6">
-          你好 <strong>{{ user.username }}</strong>，你的账户已建立。请联系系统所有者（Owner）通过你的激活申请。
+          你好 <strong>{{ user.username }}</strong>，请联系系统所有者通过激活申请。
         </p>
-        <button @click="handleLogout" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-sm">退出当前账号</button>
+        <button @click="handleLogout" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-sm">退出账号</button>
       </div>
     </div>
 
@@ -81,7 +80,7 @@ export function renderHTML() {
         </div>
         <div class="flex items-center gap-3">
           <button @click="saveSettings" :disabled="saving" class="btn-primary">保存修改</button>
-          <button @click="handleLogout" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-sm border border-slate-700">安全登出</button>
+          <button @click="handleLogout" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-sm border border-slate-700">登出</button>
         </div>
       </header>
 
@@ -94,24 +93,35 @@ export function renderHTML() {
       <div v-show="activeTab === 'config'">
         <div class="panel">
           <div class="flex justify-between items-center mb-4 border-b border-slate-700 pb-2">
-            <h2 class="text-xl font-semibold text-white">个人节点源: Sub-Store 机场阵列</h2>
+            <h2 class="text-xl font-semibold text-white">个人节点源与分流调度阵列</h2>
             <button @click="addSubscription" class="text-sm bg-slate-700 hover:bg-slate-600 px-3 py-1 rounded text-white">+ 添加订阅源</button>
           </div>
           <div v-if="sub_links.length === 0" class="text-center text-slate-500 py-6 text-sm">尚未配置节点。</div>
           
-          <div v-for="(sub, index) in sub_links" :key="index" class="flex flex-wrap md:flex-nowrap items-center gap-3 bg-slate-800 p-3 rounded mb-2 border border-slate-700">
-            <div class="w-full md:w-32">
-              <input type="text" v-model="sub.name" class="input-box text-sm" placeholder="机场别名">
+          <div v-for="(sub, index) in sub_links" :key="index" class="bg-slate-800 p-4 rounded-xl mb-4 border border-slate-700 shadow-sm">
+            <div class="flex flex-wrap md:flex-nowrap items-center gap-3">
+              <div class="w-full md:w-32">
+                <input type="text" v-model="sub.name" class="input-box text-sm" placeholder="机场别名">
+              </div>
+              <div class="flex-grow w-full">
+                <input type="text" v-model="sub.url" class="input-box text-sm font-mono" placeholder="Sub-Store 直链 (推荐带 ?target=sing-box)">
+              </div>
+              <div class="flex items-center gap-4 w-full md:w-auto justify-between md:justify-end">
+                <label class="flex items-center cursor-pointer gap-2 text-sm">
+                  <input type="checkbox" v-model="sub.enabled" class="w-4 h-4 text-blue-600 bg-slate-900 border-slate-600 rounded">
+                  <span :class="sub.enabled ? 'text-green-400' : 'text-slate-500'">启用</span>
+                </label>
+                <button @click="removeSubscription(index)" class="btn-danger">删除</button>
+              </div>
             </div>
-            <div class="flex-grow w-full">
-              <input type="text" v-model="sub.url" class="input-box text-sm font-mono" placeholder="Sub-Store 节点订阅直链">
-            </div>
-            <div class="flex items-center gap-4 w-full md:w-auto justify-between md:justify-end">
-              <label class="flex items-center cursor-pointer gap-2 text-sm">
-                <input type="checkbox" v-model="sub.enabled" class="w-4 h-4 text-blue-600 bg-slate-900 border-slate-600 rounded">
-                <span :class="sub.enabled ? 'text-green-400' : 'text-slate-500'">启用</span>
+            
+            <div class="mt-3 flex flex-wrap gap-4 items-center border-t border-slate-700/50 pt-3">
+              <span class="text-xs font-medium text-slate-400">授权引流区域：</span>
+              <label v-for="(kw, reg) in regionStr" :key="reg" class="flex items-center cursor-pointer gap-1.5 text-sm text-slate-200 hover:text-white">
+                <input type="checkbox" :value="reg" v-model="sub.allowed_regions" class="w-3.5 h-3.5 text-blue-500 bg-slate-900 border-slate-600 rounded focus:ring-blue-500 focus:ring-2">
+                {{ reg }}
               </label>
-              <button @click="removeSubscription(index)" class="btn-danger">删除</button>
+              <span v-if="Object.keys(regionStr).length === 0" class="text-xs text-amber-500">请先在全局配置中设定区域字典</span>
             </div>
           </div>
         </div>
@@ -122,23 +132,22 @@ export function renderHTML() {
           <h2 class="text-xl font-semibold mb-4 border-b border-slate-700 pb-2 text-white">🧠 大脑源: GitHub 仓库凭证</h2>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label class="block text-sm text-slate-400 mb-1">GitHub 用户名 (USER)</label>
+              <label class="block text-sm text-slate-400 mb-1">GitHub 用户名</label>
               <input type="text" v-model="globalConfig.GITHUB_USER" class="input-box" placeholder="你的 GitHub ID">
             </div>
             <div>
-              <label class="block text-sm text-slate-400 mb-1">GitHub 仓库名 (REPO)</label>
+              <label class="block text-sm text-slate-400 mb-1">仓库名 (REPO)</label>
               <input type="text" v-model="globalConfig.GITHUB_REPO" class="input-box" placeholder="例如: singbox-profiles">
             </div>
             <div>
-              <label class="block text-sm text-slate-400 mb-1">分支名称 (BRANCH)</label>
+              <label class="block text-sm text-slate-400 mb-1">分支名称</label>
               <input type="text" v-model="globalConfig.GITHUB_BRANCH" class="input-box" placeholder="master 或 main">
             </div>
             <div>
-              <label class="block text-sm text-slate-400 mb-1">GitHub 访问令牌 (TOKEN - 私有仓必需)</label>
-              <input type="password" v-model="globalConfig.GITHUB_TOKEN" class="input-box" placeholder="ghp_xxxxxxxxxxxx">
+              <label class="block text-sm text-slate-400 mb-1">GitHub PAT Token (公开仓留空)</label>
+              <input type="password" v-model="globalConfig.GITHUB_TOKEN" class="input-box" placeholder="ghp_...">
             </div>
           </div>
-          <p class="text-xs text-slate-500 mt-2">提示：引擎将利用上述参数实时去你的 GitHub 仓库拉取 <code>profiles/main-profile.json</code> 骨架。</p>
         </div>
 
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -158,7 +167,7 @@ export function renderHTML() {
               <textarea v-model="globalConfig.BANNED_KEYWORDS" class="input-box text-sm font-mono h-16"></textarea>
             </div>
             <div>
-              <label class="block text-sm font-medium text-slate-300 mb-2 border-b border-slate-700 pb-1">UrlTest 组全局探针参数</label>
+              <label class="block text-sm font-medium text-slate-300 mb-2 border-b border-slate-700 pb-1">UrlTest 全局参数</label>
               <div class="space-y-2">
                 <input type="text" v-model="globalConfig.URLTEST_PARAMS.url" class="input-box text-sm font-mono" placeholder="测速 URL">
                 <div class="flex gap-4">
@@ -244,7 +253,7 @@ export function renderHTML() {
             BANNED_KEYWORDS: "",
             URLTEST_PARAMS: { url: "", interval: "", tolerance: 150 }
           },
-          regionStr: { HK: "", TW: "", SG: "", JP: "", US: "" },
+          regionStr: { HK: "HK, 香港", TW: "TW, 台湾", SG: "SG, 新加坡", JP: "JP, 日本", US: "US, 美国" },
           adminUsers: [],
           testLogs: []
         }
@@ -269,12 +278,16 @@ export function renderHTML() {
               }
             } else {
               this.isLoggedIn = false;
+              this.user = { username: '', role: '', status: '', client_token: '' };
             }
-          } catch (e) { this.isLoggedIn = false; }
+          } catch (e) { 
+            this.isLoggedIn = false;
+            this.user = { username: '', role: '', status: '', client_token: '' };
+          }
         },
 
         async handleLogin() {
-          if (!this.authForm.username || !this.authForm.password) return alert("请完整填入账户凭证");
+          if (!this.authForm.username || !this.authForm.password) return alert("请完整填入凭证");
           this.authLoading = true;
           try {
             const res = await fetch('/api/auth/login', {
@@ -289,7 +302,7 @@ export function renderHTML() {
         },
 
         async handleRegister() {
-          if (!this.authForm.username || !this.authForm.password) return alert("请完整填入账户凭证");
+          if (!this.authForm.username || !this.authForm.password) return alert("请完整填入凭证");
           this.authLoading = true;
           try {
             const res = await fetch('/api/auth/register', {
@@ -299,8 +312,8 @@ export function renderHTML() {
             });
             const data = await res.json();
             if (res.ok && data.success) {
-              if (data.isFirstUser) { alert("🎉 初始化建站成功！你是系统首位 Owner，已自动激活，请执行登录。"); }
-              else { alert("📌 注册申请已提交，请联系管理员审核。"); }
+              if (data.isFirstUser) { alert("🎉 初始化建站成功，已自动激活！请直接登录。"); }
+              else { alert("📌 注册申请已提交，请等待管理员审核。"); }
             } else { alert(data.error); }
           } catch (e) { alert("注册异常"); }
           this.authLoading = false;
@@ -309,14 +322,19 @@ export function renderHTML() {
         async handleLogout() {
           await fetch('/api/auth/logout', { method: 'POST' });
           this.isLoggedIn = false;
-          this.user = {};
+          this.user = { username: '', role: '', status: '', client_token: '' };
         },
 
         async loadSettings() {
           try {
             const res = await fetch('/api/settings');
             const data = await res.json();
-            this.sub_links = data.sub_links || [];
+            
+            // 兼容加载，为没有 allowed_regions 的旧数据补充默认全选
+            this.sub_links = (data.sub_links || []).map(sub => {
+              if (!sub.allowed_regions) sub.allowed_regions = Object.keys(this.regionStr);
+              return sub;
+            });
             
             if (this.user.role === 'owner') {
               this.globalConfig.GITHUB_USER = data.GITHUB_USER || "";
@@ -358,7 +376,7 @@ export function renderHTML() {
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(payload)
             });
-            if (res.ok) alert("数据同步成功，边缘计算存储已锁定。");
+            if (res.ok) alert("数据同步成功！");
           } catch (e) { alert("网络提交异常"); }
           this.saving = false;
         },
@@ -384,7 +402,12 @@ export function renderHTML() {
           } catch (e) {}
         },
 
-        addSubscription() { this.sub_links.push({ name: "", url: "", enabled: true }); },
+        addSubscription() { 
+          this.sub_links.push({ 
+            name: "", url: "", enabled: true, 
+            allowed_regions: Object.keys(this.regionStr) // 默认勾选字典里的所有区域
+          }); 
+        },
         removeSubscription(index) { this.sub_links.splice(index, 1); },
         async copyUrl() {
           try {
