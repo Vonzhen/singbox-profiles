@@ -69,7 +69,7 @@ export function renderHTML() {
       <header class="flex justify-between items-center mb-6">
         <div>
           <h1 class="text-3xl font-bold tracking-tight text-white flex items-center gap-2">
-            FlowProxy <span class="text-xl font-normal text-blue-400">控制中心</span>
+            sing-box <span class="text-xl font-normal text-blue-400">配置中心</span>
           </h1>
           <div class="flex items-center gap-2 mt-1 text-xs text-slate-400">
             <span>当前用户: <strong class="text-slate-200">{{ user.username }}</strong></span>
