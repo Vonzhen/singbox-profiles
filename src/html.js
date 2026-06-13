@@ -23,6 +23,24 @@ export function renderHTML() {
     .tab-btn { padding: 0.75rem 1.5rem; font-weight: 500; border-bottom: 2px solid transparent; cursor: pointer; transition: all 0.2s; color: #94a3b8; }
     .tab-btn.active { color: #3b82f6; border-bottom-color: #3b82f6; }
     .tab-btn:hover:not(.active) { color: #e2e8f0; }
+    .status-pill { border-radius: 999px; padding: 0.125rem 0.5rem; font-size: 0.75rem; font-weight: 600; }
+    .status-success { background: rgba(34, 197, 94, 0.15); color: #86efac; }
+    .status-warning { background: rgba(245, 158, 11, 0.15); color: #fcd34d; }
+    .status-error { background: rgba(239, 68, 68, 0.15); color: #fca5a5; }
+    .toast { position: fixed; right: 1rem; top: 1rem; z-index: 50; max-width: min(24rem, calc(100vw - 2rem)); }
+    .matrix-wrap { overflow-x: auto; border: 1px solid #334155; border-radius: 0.75rem; }
+    .matrix-table { min-width: 720px; width: 100%; border-collapse: collapse; }
+    .matrix-table th, .matrix-table td { padding: 0.75rem; border-bottom: 1px solid #1e293b; text-align: left; }
+    .matrix-table th { color: #94a3b8; font-size: 0.75rem; font-weight: 600; background: #0f172a; }
+    .matrix-table td { color: #e2e8f0; font-size: 0.875rem; }
+    .matrix-check { width: 1rem; height: 1rem; accent-color: #3b82f6; }
+    .modal-backdrop { position: fixed; inset: 0; z-index: 40; background: rgba(2, 6, 23, 0.78); display: flex; align-items: center; justify-content: center; padding: 1rem; }
+    .modal-panel { width: min(42rem, 100%); max-height: calc(100vh - 2rem); overflow-y: auto; background: #1e293b; border: 1px solid #334155; border-radius: 0.75rem; padding: 1.25rem; box-shadow: 0 20px 40px rgba(0,0,0,0.35); }
+    @media (max-width: 768px) {
+      .tab-row { overflow-x: auto; white-space: nowrap; }
+      .mobile-stack { flex-direction: column; align-items: stretch; }
+      .mobile-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+    }
     [v-cloak] { display: none; }
     ::-webkit-scrollbar { width: 8px; height: 8px; }
     ::-webkit-scrollbar-track { background: #0f172a; }
@@ -31,6 +49,12 @@ export function renderHTML() {
 </head>
 <body>
   <div id="app" class="max-w-5xl mx-auto py-8 px-4" v-cloak>
+    <div class="toast space-y-2">
+      <div v-for="t in toasts" :key="t.id" class="rounded-lg border px-4 py-3 shadow-xl text-sm"
+           :class="t.type === 'error' ? 'bg-red-950 border-red-800 text-red-100' : (t.type === 'warning' ? 'bg-amber-950 border-amber-800 text-amber-100' : 'bg-slate-800 border-slate-700 text-slate-100')">
+        {{ t.message }}
+      </div>
+    </div>
     
     <div v-if="!isLoggedIn" class="min-h-[60vh] flex flex-col items-center justify-center">
       <div class="bg-slate-800 border border-slate-700 p-8 rounded-xl shadow-xl w-full max-w-md">
@@ -66,7 +90,7 @@ export function renderHTML() {
 
     <div v-else-if="user.status === 'active'">
       
-      <header class="flex justify-between items-center mb-6">
+      <header class="flex justify-between items-center mb-6 mobile-stack gap-4">
         <div>
           <h1 class="text-3xl font-bold tracking-tight text-white flex items-center gap-2">
             sing-box <span class="text-xl font-normal text-blue-400">配置中心</span>
@@ -82,51 +106,161 @@ export function renderHTML() {
         </div>
       </header>
 
-      <div class="flex border-b border-slate-700 mb-6">
+      <div class="flex border-b border-slate-700 mb-6 tab-row">
+        <button class="tab-btn" :class="{ active: activeTab === 'overview' }" @click="activeTab = 'overview'">总览</button>
         <button class="tab-btn" :class="{ active: activeTab === 'config' }" @click="activeTab = 'config'">✈️ 个人节点源</button>
         <button v-if="user.role === 'owner'" class="tab-btn" :class="{ active: activeTab === 'global' }" @click="activeTab = 'global'">⚙️ 全局与仓库控制</button>
         <button v-if="user.role === 'owner'" class="tab-btn" :class="{ active: activeTab === 'admin' }" @click="activeTab = 'admin'">👥 用户准入审核</button>
       </div>
 
+      <div v-show="activeTab === 'overview'">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          <div class="panel mb-0">
+            <div class="text-xs text-slate-400 mb-2">订阅源</div>
+            <div class="text-3xl font-bold text-white">{{ dashboard.subscriptions.enabled }}/{{ dashboard.subscriptions.total }}</div>
+            <div class="text-xs text-slate-500 mt-1">启用 / 总数</div>
+          </div>
+          <div class="panel mb-0">
+            <div class="text-xs text-slate-400 mb-2">配置缓存</div>
+            <div class="text-3xl font-bold" :class="dashboard.cache.has_config ? 'text-green-400' : 'text-amber-400'">{{ dashboard.cache.has_config ? '可用' : '暂无' }}</div>
+            <div class="text-xs text-slate-500 mt-1">{{ dashboard.cache.updated_at || '尚未生成' }}</div>
+          </div>
+          <div class="panel mb-0">
+            <div class="text-xs text-slate-400 mb-2">最近生成</div>
+            <div class="text-3xl font-bold" :class="generationClass(dashboard.generation)">{{ generationText(dashboard.generation) }}</div>
+            <div class="text-xs text-slate-500 mt-1">{{ dashboard.generation && dashboard.generation.updated_at || '暂无记录' }}</div>
+          </div>
+          <div v-if="user.role === 'owner'" class="panel mb-0">
+            <div class="text-xs text-slate-400 mb-2">GitHub 模板</div>
+            <div class="text-3xl font-bold" :class="dashboard.template && dashboard.template.ok ? 'text-green-400' : 'text-amber-400'">{{ dashboard.template && dashboard.template.ok ? '已缓存' : '待检查' }}</div>
+            <div class="text-xs text-slate-500 mt-1">{{ dashboard.template && dashboard.template.content_hash ? dashboard.template.content_hash.slice(0, 8) : '无版本' }}</div>
+          </div>
+          <div v-if="user.role === 'owner'" class="panel mb-0">
+            <div class="text-xs text-slate-400 mb-2">用户审核</div>
+            <div class="text-3xl font-bold text-white">{{ dashboard.admin.pending_users }}</div>
+            <div class="text-xs text-slate-500 mt-1">待处理 / 共 {{ dashboard.admin.total_users }} 人</div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="flex justify-between gap-4 mobile-stack">
+            <div>
+              <h2 class="text-xl font-semibold text-white mb-1">配置生成测试</h2>
+              <p class="text-sm text-slate-400">按模板、订阅拉取、节点清洗、区域分组和策略注入分步检查。</p>
+            </div>
+            <button @click="testEngine" :disabled="testing" class="btn-primary whitespace-nowrap">{{ testing ? '测试中...' : '测试生成' }}</button>
+          </div>
+
+          <div v-if="testReport" class="mt-5">
+            <div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
+              <div class="bg-slate-900/60 rounded-lg p-3 border border-slate-800">
+                <div class="text-xs text-slate-500">耗时</div>
+                <div class="text-lg font-semibold text-white">{{ testReport.summary.duration_ms }}ms</div>
+              </div>
+              <div class="bg-slate-900/60 rounded-lg p-3 border border-slate-800">
+                <div class="text-xs text-slate-500">模板来源</div>
+                <div class="text-lg font-semibold text-white">{{ testReport.summary.template_source }}</div>
+              </div>
+              <div class="bg-slate-900/60 rounded-lg p-3 border border-slate-800">
+                <div class="text-xs text-slate-500">节点</div>
+                <div class="text-lg font-semibold text-white">{{ testReport.summary.total_nodes }}</div>
+              </div>
+              <div class="bg-slate-900/60 rounded-lg p-3 border border-slate-800">
+                <div class="text-xs text-slate-500">分组</div>
+                <div class="text-lg font-semibold text-white">{{ testReport.summary.dynamic_groups }}</div>
+              </div>
+              <div class="bg-slate-900/60 rounded-lg p-3 border border-slate-800">
+                <div class="text-xs text-slate-500">警告</div>
+                <div class="text-lg font-semibold text-white">{{ testReport.summary.warnings }}</div>
+              </div>
+            </div>
+            <div class="space-y-2">
+              <div v-for="step in testReport.steps" :key="step.name" class="bg-slate-900/60 border border-slate-800 rounded-lg p-3">
+                <div class="flex justify-between gap-3 mobile-stack">
+                  <div>
+                    <div class="font-semibold text-white">{{ step.name }}</div>
+                    <div class="text-sm text-slate-400">{{ step.message }}</div>
+                  </div>
+                  <span class="status-pill self-start" :class="step.status === 'success' ? 'status-success' : (step.status === 'warning' ? 'status-warning' : 'status-error')">{{ step.status }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel border-blue-950 bg-blue-950/20">
+          <h2 class="text-xl font-semibold mb-4 border-b border-blue-900/50 pb-2 text-blue-400">客户端订阅链接</h2>
+          <div class="flex flex-col md:flex-row gap-4 items-center justify-between bg-slate-900/50 p-4 rounded-lg border border-slate-800">
+            <div class="flex-grow w-full font-mono text-sm break-all text-green-400 select-all">{{ clientUrl }}</div>
+            <div class="flex gap-2 w-full md:w-auto">
+              <button @click="copyUrl" class="btn-primary whitespace-nowrap bg-green-600 hover:bg-green-500">复制</button>
+              <button @click="resetToken" :disabled="resetting" class="px-3 py-2 bg-red-600/20 hover:bg-red-600 border border-red-500 hover:border-red-600 text-red-200 hover:text-white rounded-lg text-sm transition-colors whitespace-nowrap">
+                {{ resetting ? '重置中...' : '重置 Token' }}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div v-show="activeTab === 'config'">
         <div class="panel">
-          <div class="flex justify-between items-center mb-4 border-b border-slate-700 pb-2">
-            <h2 class="text-xl font-semibold text-white">个人节点源与分流调度阵列</h2>
-            <button @click="addSubscription" class="text-sm bg-slate-700 hover:bg-slate-600 px-3 py-1 rounded text-white">+ 添加订阅源</button>
+          <div class="flex justify-between items-center mb-4 border-b border-slate-700 pb-2 mobile-stack gap-3">
+            <div>
+              <h2 class="text-xl font-semibold text-white">个人节点源与区域授权矩阵</h2>
+              <p class="text-sm text-slate-400 mt-1">按行管理订阅源，按列控制区域授权。</p>
+            </div>
+            <button @click="addSubscription" class="text-sm bg-slate-700 hover:bg-slate-600 px-3 py-2 rounded text-white">+ 添加订阅源</button>
           </div>
           <div v-if="sub_links.length === 0" class="text-center text-slate-500 py-6 text-sm">尚未配置节点。</div>
-          
-          <div v-for="(sub, index) in sub_links" :key="index" class="bg-slate-800 p-4 rounded-xl mb-4 border border-slate-700 shadow-sm">
-            <div class="flex flex-wrap md:flex-nowrap items-center gap-3">
-              <div class="w-full md:w-32">
-                <input type="text" v-model="sub.name" class="input-box text-sm" placeholder="机场别名">
-              </div>
-              <div class="flex-grow w-full">
-                <input type="text" v-model="sub.url" class="input-box text-sm font-mono" placeholder="Sub-Store 直链 (推荐带 ?target=sing-box)">
-              </div>
-              <div class="flex items-center gap-4 w-full md:w-auto justify-between md:justify-end">
-                <label class="flex items-center cursor-pointer gap-2 text-sm">
-                  <input type="checkbox" v-model="sub.enabled" class="w-4 h-4 text-blue-600 bg-slate-900 border-slate-600 rounded">
-                  <span :class="sub.enabled ? 'text-green-400' : 'text-slate-500'">启用</span>
-                </label>
-                <button @click="removeSubscription(index)" class="btn-danger">删除</button>
-              </div>
-            </div>
-            
-            <div class="mt-3 flex flex-wrap gap-4 items-center border-t border-slate-700/50 pt-3">
-              <span class="text-xs font-medium text-slate-400">授权引流区域：</span>
-              <label v-for="(kw, reg) in regionStr" :key="reg" class="flex items-center cursor-pointer gap-1.5 text-sm text-slate-200 hover:text-white">
-                <input type="checkbox" :value="reg" v-model="sub.allowed_regions" class="w-3.5 h-3.5 text-blue-500 bg-slate-900 border-slate-600 rounded focus:ring-blue-500 focus:ring-2">
-                {{ reg }}
-              </label>
-            </div>
+
+          <div v-else class="matrix-wrap">
+            <table class="matrix-table">
+              <thead>
+                <tr>
+                  <th>订阅源</th>
+                  <th>启用</th>
+                  <th v-for="reg in regionKeys" :key="reg" class="text-center">{{ reg }}</th>
+                  <th class="text-right">操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(sub, index) in sub_links" :key="index">
+                  <td>
+                    <div class="font-semibold text-white">{{ sub.name || '未命名订阅' }}</div>
+                    <div class="text-xs text-slate-500 font-mono max-w-[18rem] truncate">{{ sub.url || '未填写 URL' }}</div>
+                  </td>
+                  <td>
+                    <input type="checkbox" v-model="sub.enabled" class="matrix-check">
+                  </td>
+                  <td v-for="reg in regionKeys" :key="reg" class="text-center">
+                    <input type="checkbox" class="matrix-check" :checked="isRegionAllowed(sub, reg)" @change="toggleRegion(sub, reg)">
+                  </td>
+                  <td>
+                    <div class="flex justify-end gap-2">
+                      <button @click="openSubEditor(index)" class="px-2 py-1 bg-slate-700 hover:bg-slate-600 text-white rounded text-xs">编辑</button>
+                      <button @click="testSubscriptionAt(index)" :disabled="testingSubIndex === index" class="px-2 py-1 bg-blue-700 hover:bg-blue-600 text-white rounded text-xs">{{ testingSubIndex === index ? '测试中' : '测试' }}</button>
+                      <button @click="removeSubscription(index)" class="btn-danger">删除</button>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </div>
       </div>
 
       <div v-show="activeTab === 'global' && user.role === 'owner'">
         <div class="panel">
-          <h2 class="text-xl font-semibold mb-4 border-b border-slate-700 pb-2 text-white">🧠 大脑源: GitHub 仓库凭证</h2>
+          <div class="flex justify-between gap-4 mb-4 border-b border-slate-700 pb-2 mobile-stack">
+            <div>
+              <h2 class="text-xl font-semibold text-white">🧠 大脑源: GitHub 仓库</h2>
+              <p class="text-sm text-slate-400 mt-1">模板路径固定为 profiles/main-profile.json，检查通过后会写入 KV 缓存。</p>
+            </div>
+            <div class="flex gap-2">
+              <button @click="checkTemplate(false)" :disabled="templateChecking" class="px-3 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-sm">检查模板</button>
+              <button @click="checkTemplate(true)" :disabled="templateChecking" class="btn-primary text-sm">强制刷新</button>
+            </div>
+          </div>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label class="block text-sm text-slate-400 mb-1">GitHub 用户名</label>
@@ -140,10 +274,13 @@ export function renderHTML() {
               <label class="block text-sm text-slate-400 mb-1">分支名称</label>
               <input type="text" v-model="globalConfig.GITHUB_BRANCH" class="input-box" placeholder="master 或 main">
             </div>
-            <div>
-              <label class="block text-sm text-slate-400 mb-1">GitHub PAT Token (公开仓留空)</label>
-              <input type="password" v-model="globalConfig.GITHUB_TOKEN" class="input-box" placeholder="ghp_...">
+          </div>
+          <div v-if="templateStatus.message" class="mt-4 bg-slate-900/60 border border-slate-800 rounded-lg p-3 text-sm">
+            <div class="flex justify-between gap-3 mobile-stack">
+              <span>{{ templateStatus.message }}</span>
+              <span class="status-pill self-start" :class="templateStatus.ok ? 'status-success' : 'status-warning'">{{ templateStatus.ok ? 'ok' : 'pending' }}</span>
             </div>
+            <div v-if="templateStatus.content_hash" class="text-xs text-slate-500 mt-2 font-mono">hash: {{ templateStatus.content_hash }}</div>
           </div>
         </div>
 
@@ -179,29 +316,49 @@ export function renderHTML() {
 
       <div v-show="activeTab === 'admin' && user.role === 'owner'">
         <div class="panel">
-          <h2 class="text-xl font-semibold mb-4 border-b border-slate-700 pb-2 text-white">系统账户审计清单</h2>
+          <h2 class="text-xl font-semibold mb-4 border-b border-slate-700 pb-2 text-white">系统账户管理</h2>
           <div class="overflow-x-auto">
-            <table class="w-full text-left text-sm border-collapse">
+            <table class="matrix-table">
               <thead>
-                <tr class="border-b border-slate-700 text-slate-400">
-                  <th class="py-2 px-4">用户名</th>
-                  <th class="py-2 px-4">系统权限</th>
-                  <th class="py-2 px-4">状态标识</th>
-                  <th class="py-2 px-4 text-right">安全审计操作</th>
+                <tr>
+                  <th>用户名</th>
+                  <th>权限</th>
+                  <th>状态</th>
+                  <th>订阅源</th>
+                  <th>最近生成</th>
+                  <th>Token</th>
+                  <th class="text-right">操作</th>
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="u in adminUsers" :key="u.username" class="border-b border-slate-800 hover:bg-slate-800/40">
-                  <td class="py-3 px-4 font-medium text-white">{{ u.username }}</td>
-                  <td class="py-3 px-4"><span class="text-xs px-2 py-0.5 rounded bg-slate-700">{{ u.role }}</span></td>
-                  <td class="py-3 px-4">
-                    <span :class="u.status === 'active' ? 'text-green-400' : 'text-amber-400'" class="text-xs font-semibold">
-                      ● {{ u.status === 'active' ? '已授权活跃' : '待激活审核' }}
-                    </span>
+                <tr v-for="u in adminUsers" :key="u.username">
+                  <td class="font-medium text-white">{{ u.username }}</td>
+                  <td><span class="text-xs px-2 py-0.5 rounded bg-slate-700">{{ u.role }}</span></td>
+                  <td>
+                    <span class="status-pill" :class="userStatusClass(u.status)">{{ userStatusText(u.status) }}</span>
                   </td>
-                  <td class="py-3 px-4 text-right">
-                    <button v-if="u.status === 'pending'" @click="approveUser(u.username)" class="bg-green-600 hover:bg-green-500 text-white text-xs px-3 py-1 rounded">准许激活</button>
-                    <span v-else class="text-xs text-slate-500">-</span>
+                  <td>
+                    <span class="text-xs text-slate-300">{{ u.enabled_sub_count || 0 }}/{{ u.sub_count || 0 }}</span>
+                  </td>
+                  <td>
+                    <div>
+                      <span class="status-pill" :class="generationStatusClass(u.generation)">{{ generationText(u.generation) }}</span>
+                      <div class="text-xs text-slate-500 mt-1">{{ u.generation && u.generation.updated_at || '-' }}</div>
+                    </div>
+                  </td>
+                  <td>
+                    <span class="text-xs font-mono" :class="u.client_token ? 'text-green-400' : 'text-slate-500'">{{ u.client_token ? '已签发' : '无' }}</span>
+                    <div class="text-xs text-slate-500 mt-1">{{ u.token_updated_at || '-' }}</div>
+                  </td>
+                  <td>
+                    <div class="flex justify-end gap-2">
+                      <button v-if="u.status === 'pending'" @click="adminAction('approve', u.username)" class="px-2 py-1 bg-green-700 hover:bg-green-600 text-white rounded text-xs">通过</button>
+                      <button v-if="u.status === 'pending'" @click="adminAction('reject', u.username)" class="px-2 py-1 bg-slate-700 hover:bg-slate-600 text-white rounded text-xs">拒绝</button>
+                      <button v-if="u.status === 'active' && u.username !== user.username" @click="adminAction('disable', u.username)" class="px-2 py-1 bg-amber-700 hover:bg-amber-600 text-white rounded text-xs">禁用</button>
+                      <button v-if="u.status === 'disabled'" @click="adminAction('enable', u.username)" class="px-2 py-1 bg-green-700 hover:bg-green-600 text-white rounded text-xs">启用</button>
+                      <button v-if="u.status !== 'pending'" @click="adminAction('reset_token', u.username)" class="px-2 py-1 bg-blue-700 hover:bg-blue-600 text-white rounded text-xs">重置 Token</button>
+                      <button v-if="u.username !== user.username" @click="adminAction('delete', u.username)" class="btn-danger">删除</button>
+                    </div>
                   </td>
                 </tr>
               </tbody>
@@ -210,29 +367,78 @@ export function renderHTML() {
         </div>
       </div>
 
-      <div class="panel mt-6 border-blue-950 bg-blue-950/20">
-        <h2 class="text-xl font-semibold mb-4 border-b border-blue-900/50 pb-2 text-blue-400">交付与配置中枢联调</h2>
-        <div class="flex flex-col md:flex-row gap-4 items-center justify-between bg-slate-900/50 p-4 rounded-lg border border-slate-800 mb-4">
-          <div class="flex-grow w-full font-mono text-sm break-all text-green-400 select-all">{{ clientUrl }}</div>
-          <div class="flex gap-2 w-full md:w-auto">
-            <button @click="copyUrl" class="btn-primary whitespace-nowrap bg-green-600 hover:bg-green-500">复制订阅链接</button>
-            <button @click="resetToken" :disabled="resetting" class="px-3 py-2 bg-red-600/20 hover:bg-red-600 border border-red-500 hover:border-red-600 text-red-200 hover:text-white rounded-lg text-sm transition-colors whitespace-nowrap">
-              {{ resetting ? '重置中...' : '重置 Token' }}
-            </button>
+    </div>
+
+    <div v-if="editingSubIndex !== null" class="modal-backdrop" @click.self="closeSubEditor">
+      <div class="modal-panel">
+        <div class="flex justify-between items-start gap-4 mb-4">
+          <div>
+            <h2 class="text-xl font-semibold text-white">编辑订阅源</h2>
+            <p class="text-sm text-slate-400 mt-1">修改名称、URL 和区域授权。</p>
           </div>
+          <button @click="closeSubEditor" class="px-3 py-1 bg-slate-700 hover:bg-slate-600 text-white rounded text-sm">关闭</button>
         </div>
-        <div>
-          <button @click="testEngine" :disabled="testing" class="w-full bg-slate-700 hover:bg-slate-600 text-white py-2 rounded text-sm font-medium transition-colors">
-            {{ testing ? '正在连接 GitHub 并拼装节点...' : '触发客户端拉取请求测试 (Debug 模式)' }}
-          </button>
-          <div v-if="testLogs.length > 0" class="mt-3 bg-[#0c0c0c] border border-slate-700 rounded-lg p-3 h-52 overflow-y-auto font-mono text-xs text-slate-300">
-            <div v-for="(log, i) in testLogs" :key="i" class="mb-1 pb-1 border-b border-slate-900/50 last:border-0">
-              <span class="text-blue-500">[{{ i+1 }}]</span> {{ log }}
+
+        <div class="space-y-4">
+          <div>
+            <label class="block text-sm text-slate-400 mb-1">名称</label>
+            <input type="text" v-model="editSubDraft.name" class="input-box" placeholder="订阅源别名">
+          </div>
+          <div>
+            <label class="block text-sm text-slate-400 mb-1">URL</label>
+            <input type="text" v-model="editSubDraft.url" class="input-box font-mono text-sm" placeholder="https://example.com/sub.json">
+          </div>
+          <label class="flex items-center gap-2 text-sm text-slate-200">
+            <input type="checkbox" v-model="editSubDraft.enabled" class="matrix-check">
+            启用该订阅源
+          </label>
+          <div>
+            <div class="text-sm text-slate-400 mb-2">授权区域</div>
+            <div class="flex flex-wrap gap-3">
+              <label v-for="reg in regionKeys" :key="reg" class="flex items-center gap-2 bg-slate-900/60 border border-slate-800 rounded-lg px-3 py-2 text-sm">
+                <input type="checkbox" :value="reg" v-model="editSubDraft.allowed_regions" class="matrix-check">
+                {{ reg }}
+              </label>
             </div>
           </div>
         </div>
-      </div>
 
+        <div v-if="subTestReport" class="mt-5 bg-slate-900/60 border border-slate-800 rounded-lg p-4">
+          <div class="flex justify-between gap-4 mobile-stack">
+            <div>
+              <div class="font-semibold text-white">{{ subTestReport.success ? '测试成功' : '测试失败' }}</div>
+              <div class="text-sm text-slate-400">{{ subTestReport.success ? ('耗时 ' + subTestReport.duration_ms + 'ms') : subTestReport.error }}</div>
+            </div>
+            <span class="status-pill self-start" :class="subTestReport.success ? 'status-success' : 'status-error'">{{ subTestReport.success ? 'ok' : 'error' }}</span>
+          </div>
+          <div v-if="subTestReport.success" class="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
+            <div class="bg-slate-950/60 rounded p-3 border border-slate-800">
+              <div class="text-xs text-slate-500">原始节点</div>
+              <div class="text-lg font-semibold text-white">{{ subTestReport.raw_nodes }}</div>
+            </div>
+            <div class="bg-slate-950/60 rounded p-3 border border-slate-800">
+              <div class="text-xs text-slate-500">有效节点</div>
+              <div class="text-lg font-semibold text-white">{{ subTestReport.valid_nodes }}</div>
+            </div>
+            <div v-for="reg in regionKeys" :key="reg" class="bg-slate-950/60 rounded p-3 border border-slate-800">
+              <div class="text-xs text-slate-500">{{ reg }}</div>
+              <div class="text-lg font-semibold text-white">{{ subTestReport.regions[reg] || 0 }}</div>
+            </div>
+            <div class="bg-slate-950/60 rounded p-3 border border-slate-800">
+              <div class="text-xs text-slate-500">未匹配</div>
+              <div class="text-lg font-semibold text-white">{{ subTestReport.regions.unmatched || 0 }}</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-5 flex justify-between gap-3 mobile-stack">
+          <button @click="testSubscriptionDraft" :disabled="testingSubIndex === editingSubIndex" class="px-4 py-2 bg-blue-700 hover:bg-blue-600 text-white rounded-lg text-sm">{{ testingSubIndex === editingSubIndex ? '测试中...' : '测试订阅源' }}</button>
+          <div class="flex gap-2">
+            <button @click="closeSubEditor" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-sm">取消</button>
+            <button @click="saveSubEditor" class="btn-primary">保存订阅源</button>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -246,22 +452,39 @@ export function renderHTML() {
           authLoading: false,
           saving: false,
           testing: false,
+          templateChecking: false,
+          testingSubIndex: null,
           resetting: false, // 联动异步控制状态
-          activeTab: 'config',
+          activeTab: 'overview',
           authForm: { username: '', password: '' },
           user: { username: '', role: '', status: '', client_token: '' },
+          dashboard: {
+            subscriptions: { total: 0, enabled: 0 },
+            cache: { has_config: false, updated_at: null, size: 0 },
+            generation: null,
+            template: null,
+            admin: { total_users: 0, pending_users: 0 }
+          },
+          templateStatus: {},
           sub_links: [],
           globalConfig: {
-            GITHUB_USER: "", GITHUB_REPO: "", GITHUB_BRANCH: "master", GITHUB_TOKEN: "",
+            GITHUB_USER: "", GITHUB_REPO: "", GITHUB_BRANCH: "master",
             BANNED_KEYWORDS: "",
             URLTEST_PARAMS: { url: "", interval: "", tolerance: 150 }
           },
           regionStr: { HK: "HK, 香港", TW: "TW, 台湾", SG: "SG, 新加坡", JP: "JP, 日本", US: "US, 美国" },
           adminUsers: [],
-          testLogs: []
+          testReport: null,
+          subTestReport: null,
+          editingSubIndex: null,
+          editSubDraft: { name: "", url: "", enabled: true, allowed_regions: [] },
+          toasts: []
         }
       },
       computed: {
+        regionKeys() {
+          return Object.keys(this.regionStr);
+        },
         clientUrl() {
           if (!this.user.client_token) return '账号未激活';
           return \`\${window.location.origin}/api/generate?token=\${this.user.client_token}\`;
@@ -269,6 +492,14 @@ export function renderHTML() {
       },
       async mounted() { await this.checkAuthStatus(); },
       methods: {
+        showToast(message, type = 'info') {
+          const id = Date.now() + Math.random();
+          this.toasts.push({ id, message, type });
+          setTimeout(() => {
+            this.toasts = this.toasts.filter(t => t.id !== id);
+          }, 3200);
+        },
+
         async checkAuthStatus() {
           try {
             const res = await fetch('/api/me');
@@ -277,6 +508,7 @@ export function renderHTML() {
               this.isLoggedIn = true;
               if (this.user.status === 'active') {
                 await this.loadSettings();
+                await this.loadDashboard();
                 if (this.user.role === 'owner') await this.loadAdminUsers();
               }
             } else {
@@ -286,7 +518,7 @@ export function renderHTML() {
         },
 
         async handleLogin() {
-          if (!this.authForm.username || !this.authForm.password) return alert("请完整填入凭证");
+          if (!this.authForm.username || !this.authForm.password) return this.showToast("请完整填入凭证", "warning");
           this.authLoading = true;
           try {
             const res = await fetch('/api/auth/login', {
@@ -295,13 +527,13 @@ export function renderHTML() {
               body: JSON.stringify(this.authForm)
             });
             const data = await res.json();
-            if (res.ok && data.success) { await this.checkAuthStatus(); } else { alert(data.error || "登录失败"); }
-          } catch (e) { alert("网络异常"); }
+            if (res.ok && data.success) { await this.checkAuthStatus(); this.showToast("登录成功", "success"); } else { this.showToast(data.error || "登录失败", "error"); }
+          } catch (e) { this.showToast("网络异常", "error"); }
           this.authLoading = false;
         },
 
         async handleRegister() {
-          if (!this.authForm.username || !this.authForm.password) return alert("请完整填入凭证");
+          if (!this.authForm.username || !this.authForm.password) return this.showToast("请完整填入凭证", "warning");
           this.authLoading = true;
           try {
             const res = await fetch('/api/auth/register', {
@@ -311,10 +543,10 @@ export function renderHTML() {
             });
             const data = await res.json();
             if (res.ok && data.success) {
-              if (data.isFirstUser) { alert("🎉 初始化建站成功，已自动激活！请直接登录。"); }
-              else { alert("📌 注册申请已提交，请等待管理员审核。"); }
-            } else { alert(data.error); }
-          } catch (e) { alert("注册异常"); }
+              if (data.isFirstUser) { this.showToast("初始化建站成功，已自动激活，请直接登录。", "success"); }
+              else { this.showToast("注册申请已提交，请等待管理员审核。", "success"); }
+            } else { this.showToast(data.error || "注册失败", "error"); }
+          } catch (e) { this.showToast("注册异常", "error"); }
           this.authLoading = false;
         },
 
@@ -338,7 +570,6 @@ export function renderHTML() {
               this.globalConfig.GITHUB_USER = data.GITHUB_USER || "";
               this.globalConfig.GITHUB_REPO = data.GITHUB_REPO || "";
               this.globalConfig.GITHUB_BRANCH = data.GITHUB_BRANCH || "master";
-              this.globalConfig.GITHUB_TOKEN = data.GITHUB_TOKEN || "";
               this.globalConfig.BANNED_KEYWORDS = data.BANNED_KEYWORDS || "";
               this.globalConfig.URLTEST_PARAMS = data.URLTEST_PARAMS || { url: "", interval: "", tolerance: 150 };
               if (data.REGION_KEYWORDS) {
@@ -348,6 +579,39 @@ export function renderHTML() {
               }
             }
           } catch (e) {}
+        },
+
+        async loadDashboard() {
+          try {
+            const res = await fetch('/api/dashboard');
+            if (!res.ok) return;
+            const data = await res.json();
+            this.dashboard = {
+              subscriptions: data.subscriptions || { total: 0, enabled: 0 },
+              cache: data.cache || { has_config: false, updated_at: null, size: 0 },
+              generation: data.generation || null,
+              template: data.template,
+              admin: data.admin || { total_users: 0, pending_users: 0 }
+            };
+            if (data.template) this.templateStatus = data.template;
+          } catch (e) {}
+        },
+
+        validateSettingsPayload(payload) {
+          for (const sub of payload.sub_links || []) {
+            if (sub.enabled && !sub.name?.trim()) return "启用的订阅源需要填写名称。";
+            if (sub.enabled && !/^https?:\\/\\//i.test(sub.url || "")) return \`订阅源 [\${sub.name || '未命名'}] 的 URL 格式不正确。\`;
+            if (sub.enabled && (!sub.allowed_regions || sub.allowed_regions.length === 0)) return \`订阅源 [\${sub.name || '未命名'}] 至少选择一个区域。\`;
+          }
+          if (this.user.role === 'owner') {
+            if (!payload.GITHUB_USER?.trim()) return "请填写 GitHub 用户名。";
+            if (!payload.GITHUB_REPO?.trim()) return "请填写 GitHub 仓库名。";
+            if (!payload.GITHUB_BRANCH?.trim()) return "请填写 GitHub 分支名。";
+            if (!/^https?:\\/\\//i.test(payload.URLTEST_PARAMS?.url || "")) return "测速 URL 格式不正确。";
+            if (!payload.URLTEST_PARAMS?.interval) return "请填写 UrlTest 间隔。";
+            if (Number(payload.URLTEST_PARAMS?.tolerance) < 0) return "UrlTest 容差不能为负数。";
+          }
+          return "";
         },
 
         async saveSettings() {
@@ -363,9 +627,15 @@ export function renderHTML() {
             payload.GITHUB_USER = this.globalConfig.GITHUB_USER;
             payload.GITHUB_REPO = this.globalConfig.GITHUB_REPO;
             payload.GITHUB_BRANCH = this.globalConfig.GITHUB_BRANCH;
-            payload.GITHUB_TOKEN = this.globalConfig.GITHUB_TOKEN;
             payload.BANNED_KEYWORDS = this.globalConfig.BANNED_KEYWORDS;
             payload.URLTEST_PARAMS = this.globalConfig.URLTEST_PARAMS;
+          }
+
+          const validationError = this.validateSettingsPayload(payload);
+          if (validationError) {
+            this.showToast(validationError, "warning");
+            this.saving = false;
+            return;
           }
 
           try {
@@ -374,9 +644,29 @@ export function renderHTML() {
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(payload)
             });
-            if (res.ok) alert("数据同步成功！");
-          } catch (e) { alert("网络提交异常"); }
+            if (res.ok) {
+              this.showToast("数据同步成功", "success");
+              await this.loadDashboard();
+            } else {
+              const data = await res.json().catch(() => ({}));
+              this.showToast(data.error || "保存失败", "error");
+            }
+          } catch (e) { this.showToast("网络提交异常", "error"); }
           this.saving = false;
+        },
+
+        async checkTemplate(force) {
+          this.templateChecking = true;
+          try {
+            const res = await fetch(force ? '/api/template/refresh' : '/api/template/check', { method: 'POST' });
+            const data = await res.json();
+            this.templateStatus = data;
+            this.showToast(data.message || (res.ok ? "模板检查完成" : "模板检查失败"), res.ok ? "success" : "error");
+            await this.loadDashboard();
+          } catch (e) {
+            this.showToast("模板检查请求失败", "error");
+          }
+          this.templateChecking = false;
         },
 
         // ====== 🚀 新增：前端异步重置 Token 触发函数 ======
@@ -390,11 +680,11 @@ export function renderHTML() {
             const data = await res.json();
             if (res.ok && data.success) {
               this.user.client_token = data.client_token; // 实时重绑 Vue 节点响应式计算
-              alert("🎉 密钥吊销过账成功！旧链接已当场报废。请及时更新你所有客户端设备上的订阅地址。");
+              this.showToast("Token 已重置，请及时更新客户端订阅地址。", "success");
             } else {
-              alert(data.error || "熔断过账失败");
+              this.showToast(data.error || "熔断过账失败", "error");
             }
-          } catch (e) { alert("网关通道中断，重置未生效"); }
+          } catch (e) { this.showToast("网关通道中断，重置未生效", "error"); }
           this.resetting = false;
         },
 
@@ -405,43 +695,160 @@ export function renderHTML() {
           } catch (e) {}
         },
 
-        async approveUser(target_username) {
+        userStatusText(status) {
+          if (status === 'active') return '活跃';
+          if (status === 'pending') return '待审核';
+          if (status === 'disabled') return '已禁用';
+          return status || '未知';
+        },
+        userStatusClass(status) {
+          if (status === 'active') return 'status-success';
+          if (status === 'pending') return 'status-warning';
+          if (status === 'disabled') return 'status-error';
+          return 'status-warning';
+        },
+        generationText(generation) {
+          if (!generation) return '无记录';
+          if (generation.status === 'success') return '成功';
+          if (generation.status === 'warning') return '缓存';
+          if (generation.status === 'error') return '失败';
+          return generation.status || '未知';
+        },
+        generationStatusClass(generation) {
+          if (!generation) return 'status-warning';
+          if (generation.status === 'success') return 'status-success';
+          if (generation.status === 'warning') return 'status-warning';
+          if (generation.status === 'error') return 'status-error';
+          return 'status-warning';
+        },
+        generationClass(generation) {
+          if (!generation) return 'text-amber-400';
+          if (generation.status === 'success') return 'text-green-400';
+          if (generation.status === 'warning') return 'text-amber-400';
+          if (generation.status === 'error') return 'text-red-400';
+          return 'text-amber-400';
+        },
+        async adminAction(action, target_username) {
+          const labels = {
+            approve: '通过',
+            reject: '拒绝并删除',
+            disable: '禁用',
+            enable: '启用',
+            reset_token: '重置 Token',
+            delete: '删除'
+          };
+          if (['reject', 'disable', 'reset_token', 'delete'].includes(action)) {
+            if (!confirm(\`确认要对用户 [\${target_username}] 执行 [\${labels[action]}] 吗？\`)) return;
+          }
           try {
-            const res = await fetch('/api/admin/approve', {
+            const res = await fetch(\`/api/admin/\${action}\`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ target_username })
             });
+            const data = await res.json().catch(() => ({}));
             if (res.ok) {
-              alert(\`已成功激活用户 [\${target_username}]。\`);
+              this.showToast(\`用户 [\${target_username}] 已执行：\${labels[action]}。\`, "success");
               await this.loadAdminUsers();
+              await this.loadDashboard();
+            } else {
+              this.showToast(data.error || "操作失败", "error");
             }
-          } catch (e) {}
+          } catch (e) { this.showToast("用户操作请求失败", "error"); }
         },
 
         addSubscription() { 
-          this.sub_links.push({ 
+          const next = { 
             name: "", url: "", enabled: true, 
             allowed_regions: Object.keys(this.regionStr)
-          }); 
+          };
+          this.sub_links.push(next);
+          this.openSubEditor(this.sub_links.length - 1);
         },
         removeSubscription(index) { this.sub_links.splice(index, 1); },
+        isRegionAllowed(sub, reg) {
+          if (!sub.allowed_regions) sub.allowed_regions = [];
+          return sub.allowed_regions.includes(reg);
+        },
+        toggleRegion(sub, reg) {
+          if (!sub.allowed_regions) sub.allowed_regions = [];
+          if (sub.allowed_regions.includes(reg)) {
+            sub.allowed_regions = sub.allowed_regions.filter(r => r !== reg);
+          } else {
+            sub.allowed_regions.push(reg);
+          }
+        },
+        openSubEditor(index) {
+          const sub = this.sub_links[index];
+          this.editingSubIndex = index;
+          this.subTestReport = null;
+          this.editSubDraft = {
+            name: sub.name || "",
+            url: sub.url || "",
+            enabled: sub.enabled !== false,
+            allowed_regions: [...(sub.allowed_regions || this.regionKeys)]
+          };
+        },
+        closeSubEditor() {
+          this.editingSubIndex = null;
+          this.subTestReport = null;
+          this.editSubDraft = { name: "", url: "", enabled: true, allowed_regions: [] };
+        },
+        saveSubEditor() {
+          if (!this.editSubDraft.name.trim()) return this.showToast("订阅源名称不能为空。", "warning");
+          if (!/^https?:\\/\\//i.test(this.editSubDraft.url || "")) return this.showToast("订阅源 URL 格式不正确。", "warning");
+          if (!this.editSubDraft.allowed_regions.length) return this.showToast("至少选择一个授权区域。", "warning");
+          this.sub_links[this.editingSubIndex] = {
+            name: this.editSubDraft.name.trim(),
+            url: this.editSubDraft.url.trim(),
+            enabled: this.editSubDraft.enabled,
+            allowed_regions: [...this.editSubDraft.allowed_regions]
+          };
+          this.showToast("订阅源已更新，记得保存修改。", "success");
+          this.closeSubEditor();
+        },
+        async testSubscriptionAt(index) {
+          this.openSubEditor(index);
+          await this.testSubscriptionDraft();
+        },
+        async testSubscriptionDraft() {
+          if (!this.editSubDraft.url) return this.showToast("请先填写订阅源 URL。", "warning");
+          this.testingSubIndex = this.editingSubIndex;
+          this.subTestReport = null;
+          try {
+            const res = await fetch('/api/subscription/test', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ subscription: this.editSubDraft })
+            });
+            const data = await res.json();
+            this.subTestReport = data;
+            this.showToast(data.success ? "订阅源测试完成。" : (data.error || "订阅源测试失败。"), data.success ? "success" : "error");
+          } catch (e) {
+            this.showToast("订阅源测试请求失败。", "error");
+          }
+          this.testingSubIndex = null;
+        },
         async copyUrl() {
           try {
             await navigator.clipboard.writeText(this.clientUrl);
-            alert("分发链接已复制。");
-          } catch (err) {}
+            this.showToast("分发链接已复制。", "success");
+          } catch (err) { this.showToast("复制失败", "error"); }
         },
 
         async testEngine() {
           this.testing = true;
-          this.testLogs = ["建立边缘模拟连接..."];
+          this.testReport = null;
           try {
             const res = await fetch(\`/api/generate?token=\${this.user.client_token}&debug=1\`);
             const result = await res.json();
-            if (res.ok && result.logs) { this.testLogs = result.logs; }
-            else { this.testLogs.push(result.error || "未返回 Debug 日志。"); }
-          } catch (e) { this.testLogs.push("引擎故障。"); }
+            if (res.ok && result.summary) {
+              this.testReport = result;
+              this.showToast("配置生成测试完成", result.summary.warnings > 0 ? "warning" : "success");
+              await this.loadDashboard();
+            }
+            else { this.showToast(result.error || "未返回结构化报告。", "error"); }
+          } catch (e) { this.showToast("引擎故障。", "error"); }
           this.testing = false;
         }
       }

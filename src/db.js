@@ -8,15 +8,70 @@
 // 1. 安全与加密工具
 // ==========================================
 
-/**
- * 使用 Web Crypto API 对密码进行 SHA-256 哈希加密
- * 绝对不向 KV 写入明文密码
- */
-export async function hashPassword(password) {
+async function sha256(password) {
   const msgBuffer = new TextEncoder().encode(password);
   const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
   const hashArray = Array.from(new Uint8Array(hashBuffer));
   return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+function bytesToHex(bytes) {
+  return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+function hexToBytes(hex) {
+  const bytes = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < bytes.length; i++) {
+    bytes[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
+  }
+  return bytes;
+}
+
+/**
+ * 使用 Web Crypto API 对密码进行 PBKDF2 哈希。
+ * 旧版 SHA-256 哈希仍可通过 verifyPassword 兼容登录。
+ */
+export async function hashPassword(password) {
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const iterations = 100000;
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(password),
+    "PBKDF2",
+    false,
+    ["deriveBits"]
+  );
+  const bits = await crypto.subtle.deriveBits(
+    { name: "PBKDF2", hash: "SHA-256", salt, iterations },
+    key,
+    256
+  );
+  return `pbkdf2$${iterations}$${bytesToHex(salt)}$${bytesToHex(new Uint8Array(bits))}`;
+}
+
+export async function verifyPassword(password, storedHash) {
+  if (!storedHash) return false;
+  if (!storedHash.startsWith("pbkdf2$")) {
+    return await sha256(password) === storedHash;
+  }
+
+  const [, iterationsRaw, saltHex, hashHex] = storedHash.split("$");
+  const iterations = Number(iterationsRaw);
+  if (!iterations || !saltHex || !hashHex) return false;
+
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(password),
+    "PBKDF2",
+    false,
+    ["deriveBits"]
+  );
+  const bits = await crypto.subtle.deriveBits(
+    { name: "PBKDF2", hash: "SHA-256", salt: hexToBytes(saltHex), iterations },
+    key,
+    256
+  );
+  return bytesToHex(new Uint8Array(bits)) === hashHex;
 }
 
 /**
@@ -37,6 +92,15 @@ export async function getUser(env, username) {
 
 export async function saveUser(env, username, userData) {
   await env.DB.put(`user:${username}`, JSON.stringify(userData));
+}
+
+export async function deleteUser(env, username) {
+  const user = await getUser(env, username);
+  if (user?.client_token) await env.DB.delete(`token:${user.client_token}`);
+  await env.DB.delete(`user:${username}`);
+  await env.DB.delete(`data:${username}:sub_links`);
+  await env.DB.delete(`cache:${username}:config`);
+  await env.DB.delete(`status:${username}:generation`);
 }
 
 // 登录态 Session 管理 (KV 结构: session:<session_id> -> username)
@@ -90,6 +154,42 @@ export async function getUserSubLinks(env, username) {
 
 export async function saveUserSubLinks(env, username, subLinks) {
   await env.DB.put(`data:${username}:sub_links`, JSON.stringify(subLinks));
+}
+
+export async function getCachedConfig(env, username) {
+  return await env.DB.get(`cache:${username}:config`);
+}
+
+export async function getCachedConfigWithMetadata(env, username) {
+  return await env.DB.getWithMetadata(`cache:${username}:config`);
+}
+
+export async function saveCachedConfig(env, username, configText) {
+  await env.DB.put(`cache:${username}:config`, configText, {
+    metadata: { updated_at: new Date().toISOString() }
+  });
+}
+
+export async function getGenerationStatus(env, username) {
+  return await env.DB.get(`status:${username}:generation`, { type: "json" });
+}
+
+export async function saveGenerationStatus(env, username, statusData) {
+  await env.DB.put(`status:${username}:generation`, JSON.stringify({
+    ...statusData,
+    updated_at: new Date().toISOString()
+  }));
+}
+
+export async function getTemplateCache(env) {
+  return await env.DB.get("global:template_cache", { type: "json" });
+}
+
+export async function saveTemplateCache(env, cacheData) {
+  await env.DB.put("global:template_cache", JSON.stringify({
+    ...cacheData,
+    fetched_at: new Date().toISOString()
+  }));
 }
 
 // ==========================================
