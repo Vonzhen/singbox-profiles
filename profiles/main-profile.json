@@ -104,14 +104,6 @@
     "final": "🐟 漏网之鱼",
     "default_domain_resolver": { "server": "Ali-DNS" }
   },
-  "services": [
-    {
-      "type": "api",
-      "listen": "0.0.0.0",
-      "listen_port": 1235,
-      "access_control_allow_private_network": true
-    }
-  ],
   "experimental": {
     "clash_api": {
       "external_controller": "127.0.0.1:20123",
