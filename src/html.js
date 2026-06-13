@@ -183,6 +183,18 @@ export function renderHTML() {
                   </div>
                   <span class="status-pill self-start" :class="step.status === 'success' ? 'status-success' : (step.status === 'warning' ? 'status-warning' : 'status-error')">{{ step.status }}</span>
                 </div>
+                <div v-if="step.details && step.details.items && step.details.items.length" class="mt-3 space-y-2">
+                  <div v-for="item in step.details.items" :key="item.name" class="flex justify-between gap-3 bg-slate-950/50 border border-slate-800 rounded px-3 py-2 text-sm mobile-stack">
+                    <div>
+                      <span class="font-medium text-slate-200">{{ item.name }}</span>
+                      <span class="text-slate-500 ml-2">原始 {{ item.raw_nodes }} / 有效 {{ item.valid_nodes }}</span>
+                    </div>
+                    <div class="text-right">
+                      <span class="status-pill" :class="item.status === 'success' ? 'status-success' : (item.status === 'warning' ? 'status-warning' : 'status-error')">{{ item.status }}</span>
+                      <div v-if="item.error" class="text-xs text-red-300 mt-1">{{ item.error }}</div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -758,12 +770,14 @@ export function renderHTML() {
         },
 
         addSubscription() { 
-          const next = { 
-            name: "", url: "", enabled: true, 
-            allowed_regions: Object.keys(this.regionStr)
+          this.editingSubIndex = -1;
+          this.subTestReport = null;
+          this.editSubDraft = {
+            name: "",
+            url: "",
+            enabled: true,
+            allowed_regions: [...this.regionKeys]
           };
-          this.sub_links.push(next);
-          this.openSubEditor(this.sub_links.length - 1);
         },
         removeSubscription(index) { this.sub_links.splice(index, 1); },
         isRegionAllowed(sub, reg) {
@@ -798,13 +812,19 @@ export function renderHTML() {
           if (!this.editSubDraft.name.trim()) return this.showToast("订阅源名称不能为空。", "warning");
           if (!/^https?:\\/\\//i.test(this.editSubDraft.url || "")) return this.showToast("订阅源 URL 格式不正确。", "warning");
           if (!this.editSubDraft.allowed_regions.length) return this.showToast("至少选择一个授权区域。", "warning");
-          this.sub_links[this.editingSubIndex] = {
+          const nextSub = {
             name: this.editSubDraft.name.trim(),
             url: this.editSubDraft.url.trim(),
             enabled: this.editSubDraft.enabled,
             allowed_regions: [...this.editSubDraft.allowed_regions]
           };
-          this.showToast("订阅源已更新，记得保存修改。", "success");
+          if (this.editingSubIndex === -1) {
+            this.sub_links.push(nextSub);
+            this.showToast("订阅源已添加，记得保存修改。", "success");
+          } else {
+            this.sub_links[this.editingSubIndex] = nextSub;
+            this.showToast("订阅源已更新，记得保存修改。", "success");
+          }
           this.closeSubEditor();
         },
         async testSubscriptionAt(index) {
