@@ -192,6 +192,28 @@ export async function saveTemplateCache(env, cacheData) {
   }));
 }
 
+export async function getBuiltinTemplate(env) {
+  return await env.DB.get("global:template_builtin", { type: "json" });
+}
+
+export async function saveBuiltinTemplate(env, templateData) {
+  await env.DB.put("global:template_builtin", JSON.stringify({
+    ...templateData,
+    updated_at: new Date().toISOString()
+  }));
+}
+
+export async function getBuiltinTemplateBackup(env) {
+  return await env.DB.get("global:template_builtin_backup", { type: "json" });
+}
+
+export async function saveBuiltinTemplateBackup(env, templateData) {
+  await env.DB.put("global:template_builtin_backup", JSON.stringify({
+    ...templateData,
+    backed_up_at: new Date().toISOString()
+  }));
+}
+
 // ==========================================
 // 4. 全局指挥部 (Global Configuration)
 // ==========================================
@@ -206,6 +228,7 @@ export async function getGlobalConfig(env) {
       REGION_KEYWORDS: { HK: ["HK", "香港"], TW: ["TW", "台湾"], SG: ["SG", "新加坡"], JP: ["JP", "日本"], US: ["US", "美国"] },
       BANNED_KEYWORDS: "过期|剩余|网址|官网|流量|到期|重置|有效|套餐|群组|通知|地址|购买|维护",
       URLTEST_PARAMS: { url: "https://www.gstatic.com/generate_204", interval: "3m", tolerance: 150 },
+      TEMPLATE_MODE: "github",
       TEMPLATE_JSON: {}
     };
   }

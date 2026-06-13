@@ -3,7 +3,7 @@
  * 主路由分发器与安全网关接口
  */
 
-import { generateConfig, getTemplate, getTemplateCacheStatus, testSubscription } from './engine.js';
+import { generateConfig, getTemplate, getTemplateCacheStatus, testSubscription, validateTemplate } from './engine.js';
 import { renderHTML } from './html.js';
 import * as db from './db.js';
 
@@ -29,6 +29,11 @@ function withSecretConfig(env, globalConfig) {
     ...safeConfig,
     GITHUB_TOKEN: env.GITHUB_TOKEN || ""
   };
+}
+
+async function hashText(text) {
+  const hash = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+  return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, "0")).join("");
 }
 
 async function getCurrentUser(request, env) {
@@ -282,7 +287,7 @@ export default {
           if (currentUser.role === 'owner') {
             const { 
               REGION_KEYWORDS, BANNED_KEYWORDS, URLTEST_PARAMS, TEMPLATE_JSON,
-              GITHUB_USER, GITHUB_REPO, GITHUB_BRANCH
+              GITHUB_USER, GITHUB_REPO, GITHUB_BRANCH, TEMPLATE_MODE
             } = body;
             const currentGlobal = await db.getGlobalConfig(env);
             await db.saveGlobalConfig(env, {
@@ -290,6 +295,7 @@ export default {
               BANNED_KEYWORDS: BANNED_KEYWORDS || currentGlobal.BANNED_KEYWORDS,
               URLTEST_PARAMS: URLTEST_PARAMS || currentGlobal.URLTEST_PARAMS,
               TEMPLATE_JSON: TEMPLATE_JSON || currentGlobal.TEMPLATE_JSON,
+              TEMPLATE_MODE: TEMPLATE_MODE === "kv" ? "kv" : "github",
               GITHUB_USER: GITHUB_USER !== undefined ? GITHUB_USER : currentGlobal.GITHUB_USER,
               GITHUB_REPO: GITHUB_REPO !== undefined ? GITHUB_REPO : currentGlobal.GITHUB_REPO,
               GITHUB_BRANCH: GITHUB_BRANCH !== undefined ? GITHUB_BRANCH : currentGlobal.GITHUB_BRANCH
@@ -316,6 +322,104 @@ export default {
           const result = await getTemplate(env, globalConfig, { forceRefresh: true });
           const { config, ...safeResult } = result;
           return jsonResponse(safeResult.status, safeResult.status.ok ? 200 : 500);
+        }
+
+        if (path === "/api/template/import_builtin" && method === "POST") {
+          const githubConfig = { ...globalConfig, TEMPLATE_MODE: "github" };
+          const result = await getTemplate(env, githubConfig, { forceRefresh: false });
+          if (!result.status.ok || !result.config) {
+            return jsonResponse({ error: result.status.message || "GitHub 模板不可用" }, 500);
+          }
+          const contentText = JSON.stringify(result.config);
+          const contentHash = await hashText(contentText);
+          await db.saveBuiltinTemplate(env, {
+            content: result.config,
+            content_hash: contentHash,
+            imported_from: result.status.source || null,
+            imported_at: new Date().toISOString(),
+            imported_by: currentUser.username
+          });
+          return jsonResponse({
+            success: true,
+            mode: "kv",
+            content_hash: contentHash,
+            message: "已将当前 GitHub 模板导入为 KV 内置模板。"
+          });
+        }
+
+        if (path === "/api/template/builtin" && method === "GET") {
+          const builtin = await db.getBuiltinTemplate(env);
+          const backup = await db.getBuiltinTemplateBackup(env);
+          return jsonResponse({
+            exists: !!builtin?.content,
+            content: builtin?.content || null,
+            content_text: builtin?.content ? JSON.stringify(builtin.content, null, 2) : "",
+            content_hash: builtin?.content_hash || "",
+            updated_at: builtin?.updated_at || null,
+            backup: backup ? {
+              exists: true,
+              content_hash: backup.content_hash || "",
+              backed_up_at: backup.backed_up_at || null
+            } : { exists: false }
+          });
+        }
+
+        if (path === "/api/template/validate_builtin" && method === "POST") {
+          const { content_text } = await request.json();
+          try {
+            const parsed = JSON.parse(content_text || "");
+            validateTemplate(parsed);
+            return jsonResponse({ success: true, message: "模板校验通过。" });
+          } catch (e) {
+            return jsonResponse({ success: false, error: e.message }, 400);
+          }
+        }
+
+        if (path === "/api/template/save_builtin" && method === "POST") {
+          const { content_text } = await request.json();
+          try {
+            const parsed = JSON.parse(content_text || "");
+            validateTemplate(parsed);
+            const current = await db.getBuiltinTemplate(env);
+            if (current?.content) {
+              await db.saveBuiltinTemplateBackup(env, {
+                content: current.content,
+                content_hash: current.content_hash || "",
+                updated_at: current.updated_at || null,
+                backed_up_by: current.updated_by || current.imported_by || ""
+              });
+            }
+            const contentHash = await hashText(JSON.stringify(parsed));
+            await db.saveBuiltinTemplate(env, {
+              content: parsed,
+              content_hash: contentHash,
+              updated_by: currentUser.username
+            });
+            return jsonResponse({ success: true, content_hash: contentHash, message: "KV 内置模板已保存。" });
+          } catch (e) {
+            return jsonResponse({ success: false, error: e.message }, 400);
+          }
+        }
+
+        if (path === "/api/template/rollback_builtin" && method === "POST") {
+          const backup = await db.getBuiltinTemplateBackup(env);
+          if (!backup?.content) return jsonResponse({ success: false, error: "没有可回滚的上一版模板。" }, 400);
+          const current = await db.getBuiltinTemplate(env);
+          if (current?.content) {
+            await db.saveBuiltinTemplateBackup(env, {
+              content: current.content,
+              content_hash: current.content_hash || "",
+              updated_at: current.updated_at || null,
+              backed_up_by: current.updated_by || current.imported_by || ""
+            });
+          }
+          await db.saveBuiltinTemplate(env, {
+            content: backup.content,
+            content_hash: backup.content_hash || await hashText(JSON.stringify(backup.content)),
+            updated_by: currentUser.username,
+            rolled_back_from: backup.backed_up_at || null
+          });
+          return jsonResponse({ success: true, message: "已回滚到上一版 KV 内置模板。" });
         }
       }
 

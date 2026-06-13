@@ -265,13 +265,24 @@ export function renderHTML() {
         <div class="panel">
           <div class="flex justify-between gap-4 mb-4 border-b border-slate-700 pb-2 mobile-stack">
             <div>
-              <h2 class="text-xl font-semibold text-white">🧠 大脑源: GitHub 仓库</h2>
-              <p class="text-sm text-slate-400 mt-1">模板路径固定为 profiles/main-profile.json，检查通过后会写入 KV 缓存。</p>
+              <h2 class="text-xl font-semibold text-white">🧠 模板来源</h2>
+              <p class="text-sm text-slate-400 mt-1">可使用 GitHub 模板，也可将模板导入 KV 后作为内置模板使用。</p>
             </div>
             <div class="flex gap-2">
-              <button @click="checkTemplate(false)" :disabled="templateChecking" class="px-3 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-sm">检查模板</button>
-              <button @click="checkTemplate(true)" :disabled="templateChecking" class="btn-primary text-sm">强制刷新</button>
+              <button v-if="globalConfig.TEMPLATE_MODE !== 'kv'" @click="checkTemplate(false)" :disabled="templateChecking" class="px-3 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-sm">检查模板</button>
+              <button v-if="globalConfig.TEMPLATE_MODE !== 'kv'" @click="checkTemplate(true)" :disabled="templateChecking" class="btn-primary text-sm">强制刷新</button>
+              <button @click="importBuiltinTemplate" :disabled="templateChecking" class="px-3 py-2 bg-green-700 hover:bg-green-600 text-white rounded-lg text-sm">导入为内置模板</button>
             </div>
+          </div>
+          <div class="mb-4 flex gap-3 mobile-stack">
+            <label class="flex items-center gap-2 bg-slate-900/60 border border-slate-800 rounded-lg px-3 py-2 text-sm">
+              <input type="radio" value="github" v-model="globalConfig.TEMPLATE_MODE" class="matrix-check">
+              GitHub 仓库模板
+            </label>
+            <label class="flex items-center gap-2 bg-slate-900/60 border border-slate-800 rounded-lg px-3 py-2 text-sm">
+              <input type="radio" value="kv" v-model="globalConfig.TEMPLATE_MODE" class="matrix-check">
+              KV 内置模板
+            </label>
           </div>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
@@ -293,6 +304,37 @@ export function renderHTML() {
               <span class="status-pill self-start" :class="templateStatus.ok ? 'status-success' : 'status-warning'">{{ templateStatus.ok ? 'ok' : 'pending' }}</span>
             </div>
             <div v-if="templateStatus.content_hash" class="text-xs text-slate-500 mt-2 font-mono">hash: {{ templateStatus.content_hash }}</div>
+          </div>
+
+          <div v-if="globalConfig.TEMPLATE_MODE === 'kv'" class="mt-4 bg-slate-900/50 border border-slate-800 rounded-xl p-4">
+            <div class="flex justify-between gap-3 mb-3 mobile-stack">
+              <div>
+                <h3 class="font-semibold text-white">KV 内置模板编辑</h3>
+                <p class="text-sm text-slate-400">保存前会校验 JSON 和引用关系，并自动备份上一版。</p>
+              </div>
+              <div class="flex gap-2 flex-wrap">
+                <button @click="loadBuiltinTemplate" class="px-3 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-sm">加载</button>
+                <button @click="copyBuiltinTemplate" class="px-3 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-sm">复制</button>
+                <button @click="formatBuiltinTemplate" class="px-3 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-sm">格式化</button>
+                <button @click="validateBuiltinTemplate" class="px-3 py-2 bg-blue-700 hover:bg-blue-600 text-white rounded-lg text-sm">校验</button>
+                <button @click="saveBuiltinTemplate" class="btn-primary text-sm">保存</button>
+                <button @click="rollbackBuiltinTemplate" class="px-3 py-2 bg-amber-700 hover:bg-amber-600 text-white rounded-lg text-sm">回滚</button>
+                <button @click="clearBuiltinTemplate" class="px-3 py-2 bg-red-900/60 hover:bg-red-800 text-red-100 rounded-lg text-sm">清空</button>
+              </div>
+            </div>
+            <textarea v-model="builtinTemplateText" @input="updateBuiltinEditorStats" class="input-box font-mono text-xs h-96 leading-relaxed" spellcheck="false" placeholder="加载或粘贴 main-profile.json 内容"></textarea>
+            <div v-if="builtinTemplateError" class="mt-3 bg-red-950/50 border border-red-800 text-red-100 rounded-lg p-3 text-sm">
+              {{ builtinTemplateError }}
+            </div>
+            <div class="mt-3 grid grid-cols-1 md:grid-cols-4 gap-3 text-xs">
+              <div class="bg-slate-950/50 border border-slate-800 rounded p-2">行数：{{ builtinEditorStats.lines }}</div>
+              <div class="bg-slate-950/50 border border-slate-800 rounded p-2">大小：{{ builtinEditorStats.size }} 字符</div>
+              <div class="bg-slate-950/50 border border-slate-800 rounded p-2">更新时间：{{ builtinTemplateMeta.updated_at || '无' }}</div>
+              <div class="bg-slate-950/50 border border-slate-800 rounded p-2">备份时间：{{ builtinTemplateMeta.backup && builtinTemplateMeta.backup.backed_up_at || '无' }}</div>
+            </div>
+            <div class="mt-2 text-xs text-slate-500 font-mono break-all">
+              当前 hash: {{ builtinTemplateMeta.content_hash || '无' }} | 备份: {{ builtinTemplateMeta.backup && builtinTemplateMeta.backup.exists ? builtinTemplateMeta.backup.content_hash : '无' }}
+            </div>
           </div>
         </div>
 
@@ -478,9 +520,14 @@ export function renderHTML() {
             admin: { total_users: 0, pending_users: 0 }
           },
           templateStatus: {},
+          builtinTemplateText: "",
+          builtinTemplateMeta: { content_hash: "", backup: { exists: false } },
+          builtinTemplateError: "",
+          builtinEditorStats: { lines: 0, size: 0 },
           sub_links: [],
           globalConfig: {
             GITHUB_USER: "", GITHUB_REPO: "", GITHUB_BRANCH: "master",
+            TEMPLATE_MODE: "github",
             BANNED_KEYWORDS: "",
             URLTEST_PARAMS: { url: "", interval: "", tolerance: 150 }
           },
@@ -582,6 +629,7 @@ export function renderHTML() {
               this.globalConfig.GITHUB_USER = data.GITHUB_USER || "";
               this.globalConfig.GITHUB_REPO = data.GITHUB_REPO || "";
               this.globalConfig.GITHUB_BRANCH = data.GITHUB_BRANCH || "master";
+              this.globalConfig.TEMPLATE_MODE = data.TEMPLATE_MODE || "github";
               this.globalConfig.BANNED_KEYWORDS = data.BANNED_KEYWORDS || "";
               this.globalConfig.URLTEST_PARAMS = data.URLTEST_PARAMS || { url: "", interval: "", tolerance: 150 };
               if (data.REGION_KEYWORDS) {
@@ -616,9 +664,11 @@ export function renderHTML() {
             if (sub.enabled && (!sub.allowed_regions || sub.allowed_regions.length === 0)) return \`订阅源 [\${sub.name || '未命名'}] 至少选择一个区域。\`;
           }
           if (this.user.role === 'owner') {
-            if (!payload.GITHUB_USER?.trim()) return "请填写 GitHub 用户名。";
-            if (!payload.GITHUB_REPO?.trim()) return "请填写 GitHub 仓库名。";
-            if (!payload.GITHUB_BRANCH?.trim()) return "请填写 GitHub 分支名。";
+            if (payload.TEMPLATE_MODE !== 'kv') {
+              if (!payload.GITHUB_USER?.trim()) return "请填写 GitHub 用户名。";
+              if (!payload.GITHUB_REPO?.trim()) return "请填写 GitHub 仓库名。";
+              if (!payload.GITHUB_BRANCH?.trim()) return "请填写 GitHub 分支名。";
+            }
             if (!/^https?:\\/\\//i.test(payload.URLTEST_PARAMS?.url || "")) return "测速 URL 格式不正确。";
             if (!payload.URLTEST_PARAMS?.interval) return "请填写 UrlTest 间隔。";
             if (Number(payload.URLTEST_PARAMS?.tolerance) < 0) return "UrlTest 容差不能为负数。";
@@ -639,6 +689,7 @@ export function renderHTML() {
             payload.GITHUB_USER = this.globalConfig.GITHUB_USER;
             payload.GITHUB_REPO = this.globalConfig.GITHUB_REPO;
             payload.GITHUB_BRANCH = this.globalConfig.GITHUB_BRANCH;
+            payload.TEMPLATE_MODE = this.globalConfig.TEMPLATE_MODE;
             payload.BANNED_KEYWORDS = this.globalConfig.BANNED_KEYWORDS;
             payload.URLTEST_PARAMS = this.globalConfig.URLTEST_PARAMS;
           }
@@ -679,6 +730,133 @@ export function renderHTML() {
             this.showToast("模板检查请求失败", "error");
           }
           this.templateChecking = false;
+        },
+
+        async importBuiltinTemplate() {
+          this.templateChecking = true;
+          try {
+            const res = await fetch('/api/template/import_builtin', { method: 'POST' });
+            const data = await res.json();
+            if (res.ok && data.success) {
+              this.templateStatus = data;
+              this.showToast(data.message || "已导入内置模板", "success");
+              await this.loadBuiltinTemplate();
+              await this.loadDashboard();
+            } else {
+              this.showToast(data.error || "导入内置模板失败", "error");
+            }
+          } catch (e) {
+            this.showToast("导入内置模板请求失败", "error");
+          }
+          this.templateChecking = false;
+        },
+
+        async loadBuiltinTemplate() {
+          try {
+            const res = await fetch('/api/template/builtin');
+            const data = await res.json();
+            if (res.ok) {
+              this.builtinTemplateText = data.content_text || "";
+              this.builtinTemplateMeta = {
+                content_hash: data.content_hash || "",
+                updated_at: data.updated_at || null,
+                backup: data.backup || { exists: false }
+              };
+              this.builtinTemplateError = "";
+              this.updateBuiltinEditorStats();
+              this.showToast(data.exists ? "内置模板已加载。" : "还没有内置模板，请先导入或粘贴保存。", data.exists ? "success" : "warning");
+            }
+          } catch (e) { this.showToast("加载内置模板失败", "error"); }
+        },
+
+        updateBuiltinEditorStats() {
+          const text = this.builtinTemplateText || "";
+          this.builtinEditorStats = {
+            lines: text ? text.split('\\n').length : 0,
+            size: text.length
+          };
+        },
+
+        async copyBuiltinTemplate() {
+          try {
+            await navigator.clipboard.writeText(this.builtinTemplateText || "");
+            this.showToast("模板内容已复制。", "success");
+          } catch (e) {
+            this.showToast("复制模板失败。", "error");
+          }
+        },
+
+        clearBuiltinTemplate() {
+          if (!confirm("确认清空当前编辑器内容吗？这不会删除已保存的 KV 模板，除非继续点击保存。")) return;
+          this.builtinTemplateText = "";
+          this.builtinTemplateError = "";
+          this.updateBuiltinEditorStats();
+        },
+
+        formatBuiltinTemplate() {
+          try {
+            this.builtinTemplateText = JSON.stringify(JSON.parse(this.builtinTemplateText || "{}"), null, 2);
+            this.builtinTemplateError = "";
+            this.updateBuiltinEditorStats();
+            this.showToast("JSON 已格式化。", "success");
+          } catch (e) {
+            this.builtinTemplateError = e.message;
+            this.showToast("JSON 格式错误，无法格式化。", "error");
+          }
+        },
+
+        async validateBuiltinTemplate() {
+          try {
+            const res = await fetch('/api/template/validate_builtin', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ content_text: this.builtinTemplateText })
+            });
+            const data = await res.json();
+            this.builtinTemplateError = res.ok ? "" : (data.error || "模板校验失败");
+            this.showToast(data.message || data.error || "模板校验完成", res.ok ? "success" : "error");
+            return res.ok;
+          } catch (e) {
+            this.builtinTemplateError = "模板校验请求失败";
+            this.showToast("模板校验请求失败", "error");
+            return false;
+          }
+        },
+
+        async saveBuiltinTemplate() {
+          const ok = await this.validateBuiltinTemplate();
+          if (!ok) return;
+          try {
+            const res = await fetch('/api/template/save_builtin', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ content_text: this.builtinTemplateText })
+            });
+            const data = await res.json();
+            if (res.ok && data.success) {
+              this.showToast(data.message || "内置模板已保存。", "success");
+              this.builtinTemplateError = "";
+              await this.loadBuiltinTemplate();
+              await this.loadDashboard();
+            } else {
+              this.showToast(data.error || "保存内置模板失败", "error");
+            }
+          } catch (e) { this.showToast("保存内置模板请求失败", "error"); }
+        },
+
+        async rollbackBuiltinTemplate() {
+          if (!confirm("确认要回滚到上一版 KV 内置模板吗？当前版本会被备份。")) return;
+          try {
+            const res = await fetch('/api/template/rollback_builtin', { method: 'POST' });
+            const data = await res.json();
+            if (res.ok && data.success) {
+              this.showToast(data.message || "已回滚内置模板。", "success");
+              await this.loadBuiltinTemplate();
+              await this.loadDashboard();
+            } else {
+              this.showToast(data.error || "回滚失败", "error");
+            }
+          } catch (e) { this.showToast("回滚请求失败", "error"); }
         },
 
         // ====== 🚀 新增：前端异步重置 Token 触发函数 ======

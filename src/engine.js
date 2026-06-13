@@ -58,12 +58,34 @@ function isSameTemplateSource(a, b) {
   return !!a && !!b && a.user === b.user && a.repo === b.repo && a.branch === b.branch && a.path === b.path;
 }
 
-function validateTemplate(config) {
+export function validateTemplate(config) {
   if (!config || typeof config !== "object" || Array.isArray(config)) {
     throw new Error("模板不是合法 JSON 对象。");
   }
   if (!Array.isArray(config.outbounds)) {
     throw new Error("模板缺少 outbounds 数组。");
+  }
+  const tags = new Set(config.outbounds.map(o => o?.tag).filter(Boolean));
+  const missing = [];
+  config.outbounds.forEach(o => {
+    if (Array.isArray(o.outbounds)) {
+      o.outbounds.forEach(tag => {
+        if (!tags.has(tag)) missing.push(`outbound [${o.tag}] 引用了不存在的 tag: ${tag}`);
+      });
+    }
+  });
+  if (config.dns?.servers) {
+    config.dns.servers.forEach(s => {
+      if (s.detour && !tags.has(s.detour)) missing.push(`DNS server [${s.tag || s.server}] detour 引用了不存在的 tag: ${s.detour}`);
+    });
+  }
+  if (config.route?.rules) {
+    config.route.rules.forEach((rule, index) => {
+      if (rule.outbound && !tags.has(rule.outbound)) missing.push(`route.rules[${index}] 引用了不存在的 outbound: ${rule.outbound}`);
+    });
+  }
+  if (missing.length > 0) {
+    throw new Error(missing.slice(0, 5).join("；"));
   }
   return true;
 }
@@ -73,6 +95,51 @@ function cloneJson(value) {
 }
 
 export async function getTemplate(env, globalConfig, options = {}) {
+  if ((globalConfig.TEMPLATE_MODE || "github") === "kv") {
+    const builtin = await db.getBuiltinTemplate(env);
+    if (!builtin?.content) {
+      return {
+        config: null,
+        status: {
+          ok: false,
+          mode: "kv",
+          from_cache: true,
+          checked_at: new Date().toISOString(),
+          content_hash: "",
+          message: "当前模板来源为 KV 内置模板，但还没有导入模板。"
+        }
+      };
+    }
+    try {
+      validateTemplate(builtin.content);
+      return {
+        config: cloneJson(builtin.content),
+        status: {
+          ok: true,
+          mode: "kv",
+          source: { type: "kv", path: "global:template_builtin" },
+          from_cache: true,
+          checked_at: new Date().toISOString(),
+          fetched_at: builtin.updated_at || null,
+          content_hash: builtin.content_hash || "",
+          message: "已使用 KV 内置模板。"
+        }
+      };
+    } catch (e) {
+      return {
+        config: null,
+        status: {
+          ok: false,
+          mode: "kv",
+          from_cache: true,
+          checked_at: new Date().toISOString(),
+          content_hash: builtin.content_hash || "",
+          message: `KV 内置模板校验失败：${e.message}`
+        }
+      };
+    }
+  }
+
   const source = getTemplateSource(globalConfig);
   const cache = await db.getTemplateCache(env);
   const cacheMatches = isSameTemplateSource(cache?.source, source);
@@ -93,6 +160,7 @@ export async function getTemplate(env, globalConfig, options = {}) {
         config: cloneJson(cache.content),
         status: {
           ok: true,
+          mode: "github",
           source,
           from_cache: true,
           checked_at: new Date().toISOString(),
@@ -123,6 +191,7 @@ export async function getTemplate(env, globalConfig, options = {}) {
       config: cloneJson(content),
       status: {
         ok: true,
+        mode: "github",
         source,
         from_cache: false,
         checked_at: new Date().toISOString(),
@@ -137,6 +206,7 @@ export async function getTemplate(env, globalConfig, options = {}) {
         config: cloneJson(cache.content),
         status: {
           ok: true,
+          mode: "github",
           source,
           from_cache: true,
           stale: true,
@@ -151,6 +221,7 @@ export async function getTemplate(env, globalConfig, options = {}) {
       config: null,
       status: {
         ok: false,
+        mode: "github",
         source,
         from_cache: false,
         checked_at: new Date().toISOString(),
@@ -163,6 +234,20 @@ export async function getTemplate(env, globalConfig, options = {}) {
 }
 
 export async function getTemplateCacheStatus(env, globalConfig) {
+  if ((globalConfig.TEMPLATE_MODE || "github") === "kv") {
+    const builtin = await db.getBuiltinTemplate(env);
+    return {
+      ok: !!builtin?.content,
+      configured: !!builtin?.content,
+      mode: "kv",
+      source: { type: "kv", path: "global:template_builtin" },
+      from_cache: true,
+      fetched_at: builtin?.updated_at || null,
+      content_hash: builtin?.content_hash || "",
+      message: builtin?.content ? "当前使用 KV 内置模板。" : "当前使用 KV 内置模板，但还没有导入模板。"
+    };
+  }
+
   let source = null;
   try {
     source = getTemplateSource(globalConfig);
@@ -174,6 +259,7 @@ export async function getTemplateCacheStatus(env, globalConfig) {
   return {
     ok: !!(cacheMatches && cache?.content),
     configured: true,
+    mode: "github",
     source,
     from_cache: !!(cacheMatches && cache?.content),
     fetched_at: cacheMatches ? cache.fetched_at || null : null,
