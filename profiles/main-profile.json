@@ -5,6 +5,14 @@
   "http_clients": [
     { "tag": "global-downloader" }
   ],
+  "services": [
+    {
+      "type": "api",
+      "listen": "0.0.0.0",
+      "listen_port": 1235,
+      "access_control_allow_private_network": true
+    }
+  ],
   "dns": {
     "servers": [
       { "tag": "Ali-DNS", "type": "https", "server": "223.5.5.5" },
