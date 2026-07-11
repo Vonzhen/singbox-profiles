@@ -218,7 +218,7 @@ export async function saveBuiltinTemplateBackup(env, templateData) {
 // 4. 全局指挥部 (Global Configuration)
 // ==========================================
 
-// KV 结构: global:config -> { REGION_KEYWORDS, BANNED_KEYWORDS, URLTEST_PARAMS, TEMPLATE_JSON }
+// KV 结构: global:config -> { REGION_KEYWORDS, BANNED_KEYWORDS, URLTEST_PARAMS, TEMPLATE_MODE, TEMPLATE_REMOTE_URL, TEMPLATE_JSON }
 export async function getGlobalConfig(env) {
   const config = await env.DB.get("global:config", { type: "json" });
   
@@ -228,7 +228,8 @@ export async function getGlobalConfig(env) {
       REGION_KEYWORDS: { HK: ["HK", "香港"], TW: ["TW", "台湾"], SG: ["SG", "新加坡"], JP: ["JP", "日本"], US: ["US", "美国"] },
       BANNED_KEYWORDS: "过期|剩余|网址|官网|流量|到期|重置|有效|套餐|群组|通知|地址|购买|维护",
       URLTEST_PARAMS: { url: "https://www.gstatic.com/generate_204", interval: "3m", tolerance: 150 },
-      TEMPLATE_MODE: "github",
+      TEMPLATE_MODE: "remote",
+      TEMPLATE_REMOTE_URL: "https://testingcf.jsdelivr.net/gh/Vonzhen/singbox-center@master/profiles/main-profile.json",
       TEMPLATE_JSON: {}
     };
   }

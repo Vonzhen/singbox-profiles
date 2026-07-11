@@ -24,11 +24,7 @@ function jsonResponse(data, status = 200, extraHeaders = {}) {
 }
 
 function withSecretConfig(env, globalConfig) {
-  const { GITHUB_TOKEN, ...safeConfig } = globalConfig || {};
-  return {
-    ...safeConfig,
-    GITHUB_TOKEN: env.GITHUB_TOKEN || ""
-  };
+  return globalConfig || {};
 }
 
 async function hashText(text) {
@@ -273,8 +269,7 @@ export default {
           
           if (currentUser.role === 'owner') {
             const globalConfig = await db.getGlobalConfig(env);
-            const { GITHUB_TOKEN, ...safeGlobalConfig } = globalConfig;
-            responseData = { ...responseData, ...safeGlobalConfig };
+            responseData = { ...responseData, ...globalConfig };
           }
           return jsonResponse(responseData);
         }
@@ -287,7 +282,7 @@ export default {
           if (currentUser.role === 'owner') {
             const { 
               REGION_KEYWORDS, BANNED_KEYWORDS, URLTEST_PARAMS, TEMPLATE_JSON,
-              GITHUB_USER, GITHUB_REPO, GITHUB_BRANCH, TEMPLATE_MODE
+              TEMPLATE_REMOTE_URL, TEMPLATE_MODE
             } = body;
             const currentGlobal = await db.getGlobalConfig(env);
             await db.saveGlobalConfig(env, {
@@ -295,10 +290,8 @@ export default {
               BANNED_KEYWORDS: BANNED_KEYWORDS || currentGlobal.BANNED_KEYWORDS,
               URLTEST_PARAMS: URLTEST_PARAMS || currentGlobal.URLTEST_PARAMS,
               TEMPLATE_JSON: TEMPLATE_JSON || currentGlobal.TEMPLATE_JSON,
-              TEMPLATE_MODE: TEMPLATE_MODE === "kv" ? "kv" : "github",
-              GITHUB_USER: GITHUB_USER !== undefined ? GITHUB_USER : currentGlobal.GITHUB_USER,
-              GITHUB_REPO: GITHUB_REPO !== undefined ? GITHUB_REPO : currentGlobal.GITHUB_REPO,
-              GITHUB_BRANCH: GITHUB_BRANCH !== undefined ? GITHUB_BRANCH : currentGlobal.GITHUB_BRANCH
+              TEMPLATE_MODE: TEMPLATE_MODE === "kv" ? "kv" : "remote",
+              TEMPLATE_REMOTE_URL: TEMPLATE_REMOTE_URL !== undefined ? TEMPLATE_REMOTE_URL : currentGlobal.TEMPLATE_REMOTE_URL
             });
           }
           return jsonResponse({ success: true });
@@ -325,10 +318,10 @@ export default {
         }
 
         if (path === "/api/template/import_builtin" && method === "POST") {
-          const githubConfig = { ...globalConfig, TEMPLATE_MODE: "github" };
-          const result = await getTemplate(env, githubConfig, { forceRefresh: false });
+          const remoteConfig = { ...globalConfig, TEMPLATE_MODE: "remote" };
+          const result = await getTemplate(env, remoteConfig, { forceRefresh: false });
           if (!result.status.ok || !result.config) {
-            return jsonResponse({ error: result.status.message || "GitHub 模板不可用" }, 500);
+            return jsonResponse({ error: result.status.message || "远程模板不可用" }, 500);
           }
           const contentText = JSON.stringify(result.config);
           const contentHash = await hashText(contentText);
@@ -343,7 +336,7 @@ export default {
             success: true,
             mode: "kv",
             content_hash: contentHash,
-            message: "已将当前 GitHub 模板导入为 KV 内置模板。"
+            message: "已将当前远程模板导入为 KV 内置模板。"
           });
         }
 
