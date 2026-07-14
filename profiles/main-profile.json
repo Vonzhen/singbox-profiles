@@ -15,7 +15,7 @@
     { "action": "reject", "rule_set": "geosite-category-ads-all", "method": "default" },
     { "action": "route", "clash_mode": "direct", "server": "Ali-DNS" },
     { "action": "route", "clash_mode": "global", "server": "Cloudflare-DNS" },
-    { "action": "route", "rule_set": "geosite-cn", "server": "Ali-DNS" },
+    { "action": "route", "rule_set": ["geosite-cn", "geosite-private"], "server": "Ali-DNS" },
     { "action": "route", "rule_set": "geosite-geolocation-!cn", "server": "Cloudflare-DNS" },
     { "action": "evaluate", "server": "Cloudflare-DNS" },
     { "action": "route", "match_response": true, "rule_set": "geoip-cn", "server": "Ali-DNS" },
@@ -69,7 +69,7 @@
       { "rule_set": ["geosite-tiktok"], "outbound": "📽️ TikTok" },
       { "rule_set": ["geosite-privateemby"], "outbound": "🎞 Emby" },
       { "rule_set": ["geosite-telegram", "geoip-telegram"], "outbound": "🛩️ Telegram" },
-      { "rule_set": ["geosite-cn", "geoip-cn", "geosite-privatedirect"], "outbound": "🎯 全球直连" },
+      { "rule_set": ["geosite-cn", "geoip-cn", "geosite-private", "geoip-private", "geosite-privatedirect"], "outbound": "🎯 全球直连" },
       { "rule_set": ["geosite-geolocation-!cn"], "outbound": "🗽 节点选择" }
     ],
     "rule_set": [
@@ -97,6 +97,8 @@
       { "tag": "geosite-category-ads-all", "type": "remote", "url": "https://testingcf.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@sing/geo/geosite/category-ads-all.srs", "format": "binary" },
       { "tag": "geoip-cn", "type": "remote", "url": "https://testingcf.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@sing/geo/geoip/cn.srs", "format": "binary" },
       { "tag": "geosite-cn", "type": "remote", "url": "https://testingcf.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@sing/geo/geosite/cn.srs", "format": "binary" },
+      { "tag": "geosite-private", "type": "remote", "url": "https://testingcf.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@sing/geo/geosite/private.srs", "format": "binary" },
+      { "tag": "geoip-private", "type": "remote", "url": "https://testingcf.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@sing/geo/geoip/private.srs", "format": "binary" },
       { "tag": "geosite-geolocation-!cn", "type": "remote", "url": "https://testingcf.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@sing/geo/geosite/geolocation-!cn.srs", "format": "binary" }
     ],
     "default_http_client": "global-downloader",
