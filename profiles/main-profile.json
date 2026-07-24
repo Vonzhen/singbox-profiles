@@ -2,9 +2,6 @@
   "log": {
     "level": "info"
   },
-  "http_clients": [
-    { "tag": "global-downloader" }
-  ],
   "dns": {
     "servers": [
       { "type": "https", "tag": "Ali-DNS", "server": "223.5.5.5" },
@@ -25,9 +22,11 @@
     "final": "Google-DNS",
     "strategy": "prefer_ipv4"
   },
+  "http_clients": [
+    { "tag": "global-downloader", "version": 2, "stream_receive_window": 0, "connection_receive_window": 0 }
+  ],
   "inbounds": [
-    {
-      "type": "tun", "tag": "tun-in", "mtu": 9000, "address": ["172.18.0.1/30", "fdfe:dcba:9876::1/126"], "auto_route": true, "strict_route": false, "stack": "mixed", "dns_mode": "hijack" }
+    { "type": "tun", "tag": "tun-in", "mtu": 9000, "address": ["172.18.0.1/30", "fdfe:dcba:9876::1/126"], "dns_mode": "hijack", "auto_route": true, "stack": "mixed" }
   ],
   "outbounds": [
     { "type": "direct", "tag": "🎯 全球直连" },
