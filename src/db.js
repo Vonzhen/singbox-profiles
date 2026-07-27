@@ -229,7 +229,7 @@ export async function getGlobalConfig(env) {
       BANNED_KEYWORDS: "过期|剩余|网址|官网|流量|到期|重置|有效|套餐|群组|通知|地址|购买|维护",
       URLTEST_PARAMS: { url: "https://www.gstatic.com/generate_204", interval: "3m", tolerance: 150 },
       TEMPLATE_MODE: "remote",
-      TEMPLATE_REMOTE_URL: "https://testingcf.jsdelivr.net/gh/Vonzhen/singbox-center@master/profiles/main-profile.json",
+      TEMPLATE_REMOTE_URL: "https://testingcf.jsdelivr.net/gh/miozen/singbox-center@master/profiles/main-profile.json",
       TEMPLATE_JSON: {}
     };
   }
