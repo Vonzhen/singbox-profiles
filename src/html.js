@@ -287,7 +287,7 @@ export function renderHTML() {
           <div class="grid grid-cols-1 gap-4">
             <div>
               <label class="block text-sm text-slate-400 mb-1">远程模板地址</label>
-              <input type="text" v-model="globalConfig.TEMPLATE_REMOTE_URL" class="input-box font-mono text-sm" placeholder="https://testingcf.jsdelivr.net/gh/Vonzhen/singbox-center@master/profiles/main-profile.json">
+              <input type="text" v-model="globalConfig.TEMPLATE_REMOTE_URL" class="input-box font-mono text-sm" placeholder="https://testingcf.jsdelivr.net/gh/miozen/singbox-center@master/profiles/main-profile.json">
             </div>
           </div>
           <div v-if="templateStatus.message" class="mt-4 bg-slate-900/60 border border-slate-800 rounded-lg p-3 text-sm">
