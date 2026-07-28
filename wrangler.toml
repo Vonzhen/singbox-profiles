@@ -1,5 +1,5 @@
 #:schema https://cloudflare.github.io/wrangler-schema/config.schema.json
-name = "singbox-remote-worker"
+name = "singbox-profiles"
 main = "src/index.js"
 compatibility_date = "2024-01-27" 
 
